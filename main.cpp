@@ -210,7 +210,7 @@ void renderScene(void)
  	
 	GLfloat ambientLight[] = { 0.8f, 0.8f, 0.8f, 0.0f };     // <1>
 	GLfloat diffuseLight[] = { 0.8f, 0.8f, 0.8f, 0.0f };       // <2>
-	GLfloat lightPos[] = { 0.0f, 10.0f, -10.0f, 0.0f };    // <3>
+	GLfloat lightPos[] = { 0.0f, 10.0f, -10.0f, 0.0f };    // <3>sss
 	   
 	glEnable(GL_LIGHTING);                                     // <4>
 	glEnable(GL_LIGHT0);                                       // <8>
@@ -219,7 +219,7 @@ void renderScene(void)
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);               // <7>
 	glEnable(GL_COLOR_MATERIAL);
  	drawSkeleton();
- 	drawTrackball();
+ 	// drawTrackball();
  	// renderCube(0.4, 0.4, 0.4);
  	// glutSolidTeapot(0.5f);
  	glDisable(GL_LIGHTING);
@@ -234,6 +234,27 @@ void renderScene(void)
 /// called every frameTime sec.
 void Timer(int value)
 {
+	MotionNode* curNode = bvhParser->getRootNode();
+	Eigen::Vector3d rotation;
+	rotation = Eigen::Vector3d(curNode->data[mFrame][3], curNode->data[mFrame][4], curNode->data[mFrame][5]);
+	worldSkel->getRootBodyNode()
+	->setWorldTranslation(Eigen::Vector3d(curNode->data[mFrame][0]*scale, curNode->data[mFrame][1]*scale, curNode->data[mFrame][2]*scale));
+	worldSkel->getRootBodyNode()
+	->setWorldRotation(Eigen::AngleAxisd(rotation.norm(), rotation.normalized()).toRotationMatrix());
+
+	curNode= curNode->getNextNode();
+	while(curNode!=nullptr)
+	{
+		if(curNode->checkEnd())
+		{
+			cout<<curNode->getName()<<endl;
+			curNode = curNode->getNextNode();
+			continue;
+		}
+		rotation = Eigen::Vector3d(curNode->data[mFrame][0], curNode->data[mFrame][1], curNode->data[mFrame][2]);
+		worldSkel->getBodyNode(curNode->getName())->setRotation(Eigen::AngleAxisd(rotation.norm(), rotation.normalized()).toRotationMatrix());
+		curNode = curNode->getNextNode();
+	}
 	renderScene();
 	mFrame++;
 	mFrame %= bvhParser->frames;
@@ -253,34 +274,31 @@ void processMouse(int button, int state, int x, int y)
 		{
 			px = x;
 			py = y;
-			if(glutGetModifiers() == GLUT_ACTIVE_CTRL)
-			{
-				selectedObject = selectObject(x, y);
-				if(selectedObject >= 0)
-				{
-					cout<<worldSkel->getBodyNode(selectedObject)->getName()<<endl;
-					prev_skel_transform = worldSkel->getBodyNode(selectedObject)->getTransform();
-					prev_skel_positions= worldSkel->getPositions();
-					prev_obj_trackBall_transform = obj_trackBall_transform;
-					mouseObjectRotate_ON = true;
-				}
-				else{
-					mouseObjectRotate_ON = false;
-				}
-			}
-			else
-			{
-				prev_eye = eye;
-				prev_viewUp = viewUp;
-				mouseViewRotate_ON = true;
-			}
+			// if(glutGetModifiers() == GLUT_ACTIVE_CTRL)
+			// {
+			// 	selectedObject = selectObject(x, y);
+			// 	if(selectedObject >= 0)
+			// 	{
+			// 		cout<<worldSkel->getBodyNode(selectedObject)->getName()<<endl;
+			// 		prev_skel_transform = worldSkel->getBodyNode(selectedObject)->getTransform();
+			// 		prev_skel_positions= worldSkel->getPositions();
+			// 		prev_obj_trackBall_transform = obj_trackBall_transform;
+			// 		mouseObjectRotate_ON = true;
+			// 	}
+			// 	else{
+			// 		mouseObjectRotate_ON = false;
+			// 	}
+			// }
+			prev_eye = eye;
+			prev_viewUp = viewUp;
+			mouseViewRotate_ON = true;
 		}
 		else
 		{
-			mouseObjectRotate_ON = false;
 			mouseViewRotate_ON = false;
-			hideObjTrackball();
-			selectedObject = -1;
+			// mouseObjectRotate_ON = false;
+			// hideObjTrackball();
+			// selectedObject = -1;
 		}
 	}
 	else if(button == GLUT_RIGHT_BUTTON)
@@ -289,35 +307,32 @@ void processMouse(int button, int state, int x, int y)
 		{
 			px = x;
 			py = y;
-			if(glutGetModifiers() == GLUT_ACTIVE_CTRL)
-			{
-				selectedObject = selectObject(x, y);
-				if(selectedObject >= 0)
-				{
-					mouseObjectTranslate_ON = true;
-					cout<<worldSkel->getBodyNode(selectedObject)->getName()<<endl;
+			// if(glutGetModifiers() == GLUT_ACTIVE_CTRL)
+			// {
+			// 	selectedObject = selectObject(x, y);
+			// 	if(selectedObject >= 0)
+			// 	{
+			// 		mouseObjectTranslate_ON = true;
+			// 		cout<<worldSkel->getBodyNode(selectedObject)->getName()<<endl;
 
-					prev_skel_positions= worldSkel->getPositions();
-				}
-				else{
-					mouseObjectTranslate_ON = false;
-				}
+			// 		prev_skel_positions= worldSkel->getPositions();
+			// 	}
+			// 	else{
+			// 		mouseObjectTranslate_ON = false;
+			// 	}
 					
 
-			}
-			else
-			{
-				prev_eye = eye;
-				prev_viewCenter = viewCenter;
-				mouseViewTranslate_ON = true;
-			}
+			// }
+			prev_eye = eye;
+			prev_viewCenter = viewCenter;
+			mouseViewTranslate_ON = true;
 		}
 		else
 		{
 			mouseViewTranslate_ON = false;
-			mouseObjectTranslate_ON = false;
-			hideObjTrackball();
-			selectedObject = -1;
+			// mouseObjectTranslate_ON = false;
+			// hideObjTrackball();
+			// selectedObject = -1;
 		}
 	}
 	else if(button == 3 && state == GLUT_DOWN)
@@ -608,14 +623,14 @@ void pressedProcessMouse(int x, int y) {
 	{
 		translateView(x, y);
 	}
-	if(mouseObjectTranslate_ON)
-	{
-		solveJacobianIK_translation(x,y);
-	}
-	if(mouseObjectRotate_ON)
-	{
-		solveJacobianIK_rotation(x,y);
-	}
+	// if(mouseObjectTranslate_ON)
+	// {
+	// 	solveJacobianIK_translation(x,y);
+	// }
+	// if(mouseObjectRotate_ON)
+	// {
+	// 	solveJacobianIK_rotation(x,y);
+	// }
 	renderScene();
 }
 
@@ -695,13 +710,14 @@ int main(int argc, char **argv) {
 	initViewUP();
 	mFrame = 0;
 	worldSkel = createBVHSkeleton("../data/Trial001.bvh");
-	hideObjTrackball();
+	// hideObjTrackball();
+
 	// register callbacks
 	glutDisplayFunc(renderScene);
 	glutReshapeFunc(resize);
 	glutMouseFunc(processMouse);
 	glutMotionFunc(pressedProcessMouse);
-	glutPassiveMotionFunc(passiveProcessMouse);
+	//glutPassiveMotionFunc(passiveProcessMouse);
 	glutKeyboardFunc(keyboard);
 	glutTimerFunc(mDisplayTimeout, Timer, 0);
 

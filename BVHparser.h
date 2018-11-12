@@ -56,6 +56,7 @@ public :
 	int frames;
 	float frameTime;
 	MotionNode* getRootNode();
+	const char* getPath();
 	void writeSkelFile();
 	void useLowerBodyOnly();
 	void useUpperBodyOnly();

@@ -5,12 +5,16 @@
 #include <Eigen/Dense>
 #include "Skeleton.h"
 #include "BVHparser.h"
+#include "BVHmanager.h"
 #define M_PI 3.14159265358979323846
+#define MOTION_STATE_STOP 10
+#define MOTION_STATE_LEFT_FOOT 11
+#define MOTION_STATE_RIGHT_FOOT 12
 using namespace std;
 
 float fovy = 50.0f;
 float aspectRatio = 1260.0f / 760.0f;
-Eigen::Vector3d eye(0.0f, 8.0f, -10.0f);
+Eigen::Vector3d eye(0.0f, 10.0f, -20.0f);
 Eigen::Vector3d viewCenter(0.0f, 0.0f, 0.0f);
 Eigen::Vector3d viewUp(0.0f, 1.0f, 0.0f);
 
@@ -29,7 +33,7 @@ Eigen::Vector3d actual_cur_point, actual_prev_point;
 Eigen::VectorXd prev_skel_positions;
 Eigen::Isometry3d prev_skel_transform;
 SkeletonPtr worldSkel;
-BVHparser* bvhParser;
+BVHmanager* bvhmanager;
 float scale = 1.0/20.0;
 int selectedObject = -1;
 int selectingObject = -1;
@@ -41,7 +45,35 @@ double trackball_radius = 1.0;
 int mFrame;
 int mDisplayTimeout;
 
+int CONTROL_front_stack = 0; //we can represent backward walking as negative value
+int CONTROL_leftTurn_stack = 0;	//we can represent right turn as negative value
+
+bool play = true;
+
+double remain_frame = 0;
+
+string prev_action ="";	//action played before
+int prev_action_end_frame;
+string cur_action ="";	//action currently playing
+int cur_action_end_frame;
+int cur_action_start_frame;
+
+int MOTION_STATE = MOTION_STATE_STOP;
+
+Eigen::Vector3d root_rotation_displacement;
+Eigen::Vector3d root_translation_displacement;
+Eigen::VectorXd prev_action_end_frame_position;
+
+bool first_call = true;
 using namespace std;
+
+/// View Up should match to our eye, viewCener
+void initViewUP()
+{
+	Eigen::Vector3d viewRight = (viewCenter - eye).normalized().cross(viewUp);
+	viewRight.normalize();
+	viewUp = viewRight.cross((viewCenter - eye).normalized());
+}
 
 void hideObjTrackball()
 {
@@ -92,24 +124,24 @@ void renderCube(float width, float height, float depth) {
 void showXYZaxis()
 {
 	glColor3f(1.0, 0.0, 0.0);
-	glLineWidth(2.0);
+	glLineWidth(4.0);
 	glBegin(GL_LINES);
 	glVertex3f(0.0, 0.0, 0.0);
-	glVertex3f(1.0, 0.0, 0.0);
+	glVertex3f(2.0, 0.0, 0.0);
 	glEnd();
 
 	glColor3f(0.0, 1.0, 0.0);
-	glLineWidth(2.0);
+	glLineWidth(4.0);
 	glBegin(GL_LINES);
 	glVertex3f(0.0, 0.0, 0.0);
-	glVertex3f(0.0, 1.0, 0.0);
+	glVertex3f(0.0, 2.0, 0.0);
 	glEnd();
 
 	glColor3f(0.0, 0.0, 1.0);
-	glLineWidth(2.0);
+	glLineWidth(4.0);
 	glBegin(GL_LINES);
 	glVertex3f(0.0, 0.0, 0.0);
-	glVertex3f(0.0, 0.0, 1.0);
+	glVertex3f(0.0, 0.0, 2.0);
 	glEnd();
 
 }
@@ -151,6 +183,33 @@ void drawTrackball()
 
 }
 
+/// Draw floor
+void drawFloor()
+{
+	glPushMatrix();
+	glTranslated(0.0, -0.1, 0.0);
+	glColor3f(1.0f, 1.0f, 1.0f);
+	renderCube(1000.0, 0.0, 1000.0);
+	for(int i =0;i<250;i++)
+	{
+		glColor3f(0.0, 0.0, 0.0);
+		glLineWidth(1.0);
+		glBegin(GL_LINES);
+		glVertex3f(500.0 -4.0 *i, 0.1f, -500.0);
+		glVertex3f(500.0 -4.0 *i, 0.1f, 500.0);
+		glEnd();
+
+		glColor3f(0.0, 0.0, 0.0);
+		glLineWidth(1.0);
+		glBegin(GL_LINES);
+		glVertex3f(-500.0, 0.1f, 500.0 -4.0 *i);
+		glVertex3f(500.0, 0.1f, 500.0 -4.0 *i);
+		glEnd();
+	}
+
+	glPopMatrix();
+}
+
 /// Picking. return the content(integer) of glPushName(int index)
 int selectObject(GLint x, GLint y)
 {
@@ -166,7 +225,7 @@ int selectObject(GLint x, GLint y)
 	gluPickMatrix(x, viewport[3]-y, 2, 2, viewport);
 	gluPerspective(fovy, 
 		aspectRatio,
-		0.1f, 100.0f);
+		0.1f, 150.0f);
 	glMatrixMode(GL_MODELVIEW); 
 	glLoadIdentity();
  	gluLookAt(eye[0], eye[1], eye[2],
@@ -200,7 +259,7 @@ void renderScene(void)
 	glLoadIdentity();
 	gluPerspective(fovy, 
 		aspectRatio,
-		0.1f, 100.0f);
+		0.1f, 150.0f);
 	glMatrixMode(GL_MODELVIEW); 
 	glLoadIdentity();
  	gluLookAt(eye[0], eye[1], eye[2],
@@ -219,6 +278,7 @@ void renderScene(void)
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);               // <7>
 	glEnable(GL_COLOR_MATERIAL);
  	drawSkeleton();
+ 	drawFloor();
  	// drawTrackball();
  	// renderCube(0.4, 0.4, 0.4);
  	// glutSolidTeapot(0.5f);
@@ -231,33 +291,208 @@ void renderScene(void)
  	glutSwapBuffers();
 }
 
+void TranslateViewCenter_Eye(Eigen::Vector3d pos)
+{
+	Eigen::Vector3d temp = eye - viewCenter;
+	viewCenter = pos;
+	eye = viewCenter + temp;
+	initViewUP();
+}
+
+// we will execute speed stack after turning stack
+string
+StackToAction()
+{
+	if(CONTROL_leftTurn_stack == 1)
+		return "left_45";
+	else if(CONTROL_leftTurn_stack == 2)
+		return "left_90";
+	else if(CONTROL_leftTurn_stack >= 3)
+		return "left_135";
+	else if(CONTROL_leftTurn_stack == -1)
+		return "right_45";
+	else if(CONTROL_leftTurn_stack == -2)
+		return "right_90";
+	else if(CONTROL_leftTurn_stack <= -3)
+		return "right_135";
+	//here CONTROL_leftTurn_stack is 0
+	else if(CONTROL_front_stack <= 0)
+	{
+		if(MOTION_STATE == MOTION_STATE_LEFT_FOOT)
+			return "walk_stop_left";
+		else if(MOTION_STATE == MOTION_STATE_RIGHT_FOOT)
+			return "walk_stop_right";
+		else
+			return "stop";
+	}
+	else if(CONTROL_front_stack == 1)
+		return "walk_slow";
+	else if(CONTROL_front_stack == 2)
+		return "walk_normal";
+	else if(CONTROL_front_stack >= 3)
+		return "walk_fast";
+	cout<<"there is a bug on StackToAction"<<endl;
+	return "";
+}
+
+// if the contact foot is opposite, the next action would be changing foot
+void
+SetActionFromStack()
+{
+	int start_frame, end_frame;
+	int start_motion_state, end_motion_state;
+	bvhmanager->getStartEndFrame(StackToAction().c_str(), 
+		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
+	if(MOTION_STATE == start_motion_state)
+	{
+		cout<<cur_action<<endl;
+		cout<<endl;
+		prev_action = cur_action;
+		cur_action = StackToAction();
+		
+		CONTROL_leftTurn_stack = 0;	//we will turn. so reset the left turn stack.
+	}
+	else if(MOTION_STATE == MOTION_STATE_LEFT_FOOT 
+		&& start_motion_state == MOTION_STATE_RIGHT_FOOT)
+	{
+		prev_action = cur_action;
+		cur_action = "walk_left_to_right";
+		bvhmanager->getStartEndFrame("walk_left_to_right", 
+		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
+	}
+	else if(MOTION_STATE == MOTION_STATE_RIGHT_FOOT 
+		&& start_motion_state == MOTION_STATE_LEFT_FOOT)
+	{
+		prev_action = cur_action;
+		cur_action = "walk_right_to_left";
+		bvhmanager->getStartEndFrame("walk_right_to_left", 
+		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
+	}
+	// if curent step is stop and we want to turn left, we add walk_start to move it. 
+	else if(MOTION_STATE == MOTION_STATE_STOP 
+		&& start_motion_state != MOTION_STATE_STOP)
+	{
+		prev_action = cur_action;
+		cur_action = "walk_start";
+		bvhmanager->getStartEndFrame("walk_start", 
+		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
+	
+	}
+	else
+	{
+		cout<<"stack : "<<CONTROL_front_stack<<endl;
+		cout<<"why else ? prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
+	}
+	prev_action_end_frame_position = worldSkel->getPositions();
+
+	mFrame = start_frame;
+	cur_action_start_frame = start_frame;
+	cur_action_end_frame = end_frame;
+	MOTION_STATE = end_motion_state;
+
+	root_translation_displacement
+	= worldSkel->getPositions().segment(0,3)
+	- Eigen::Vector3d(
+		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
+	->data[start_frame][0]*scale,
+		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
+	->data[start_frame][1]*scale,
+		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
+	->data[start_frame][2]*scale);
+	root_translation_displacement.y() = 0.0;
+
+	root_rotation_displacement = 
+	QuaternionToAngleAxis(Eigen::Quaterniond(AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3)))
+	* AngleAxisToQuaternion(Eigen::Vector3d(
+		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
+	->data[start_frame][3],
+		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
+	->data[start_frame][4],
+		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
+	->data[start_frame][5])).inverse());
+
+	root_rotation_displacement.x() = 0;
+	root_rotation_displacement.z() = 0;
+}
+
 /// called every frameTime sec.
 void Timer(int value)
 {
-	MotionNode* curNode = bvhParser->getRootNode();
+	if(cur_action_end_frame < mFrame)
+	{
+		SetActionFromStack();
+	}
+	// cout<<"Timer prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
+	MotionNode* curNode = bvhmanager->getBVHparser(cur_action.c_str())->getRootNode();
 	Eigen::Vector3d rotation;
 	rotation = Eigen::Vector3d(curNode->data[mFrame][3], curNode->data[mFrame][4], curNode->data[mFrame][5]);
+	Eigen::Vector3d start_frame_position 
+	= Eigen::Vector3d(curNode->data[cur_action_start_frame][0]*scale, 
+		curNode->data[cur_action_start_frame][1]*scale, 
+		curNode->data[cur_action_start_frame][2]*scale);
+	Eigen::Vector3d cur_frame_position = Eigen::Vector3d(curNode->data[mFrame][0]*scale, curNode->data[mFrame][1]*scale, curNode->data[mFrame][2]*scale);
 	worldSkel->getRootBodyNode()
-	->setWorldTranslation(Eigen::Vector3d(curNode->data[mFrame][0]*scale, curNode->data[mFrame][1]*scale, curNode->data[mFrame][2]*scale));
+	->setWorldTranslation(
+		start_frame_position +
+		AngleAxisToQuaternion(root_rotation_displacement).toRotationMatrix()*
+		Eigen::Vector3d(cur_frame_position - start_frame_position));
 	worldSkel->getRootBodyNode()
-	->setWorldRotation(Eigen::AngleAxisd(rotation.norm(), rotation.normalized()).toRotationMatrix());
+	->setWorldRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
+
+	// keep the root position by root_translation_displacement
+
+	// worldSkel->getRootBodyNode()->Translate(worldSkel->getRootBodyNode()
+	// 	->getWorldTransform().linear().inverse() * root_translation_displacement);
+	// cout<<"translation : "<<root_translation_displacement.transpose()<<endl;
+	// cout<<"rotation : "<<root_rotation_displacement.transpose()<<endl;
+
+	Eigen::VectorXd displaced_position = worldSkel->getPositions();
+
+	displaced_position.segment(3,3) += root_rotation_displacement;
+
+	displaced_position.segment(0,3) += root_translation_displacement;
+
+	worldSkel->setPositions(displaced_position);
+
+	TranslateViewCenter_Eye(worldSkel->getPositions().segment(0,3));
+
 
 	curNode= curNode->getNextNode();
 	while(curNode!=nullptr)
 	{
 		if(curNode->checkEnd())
 		{
-			cout<<curNode->getName()<<endl;
 			curNode = curNode->getNextNode();
 			continue;
 		}
 		rotation = Eigen::Vector3d(curNode->data[mFrame][0], curNode->data[mFrame][1], curNode->data[mFrame][2]);
-		worldSkel->getBodyNode(curNode->getName())->setRotation(Eigen::AngleAxisd(rotation.norm(), rotation.normalized()).toRotationMatrix());
+		worldSkel->getBodyNode(curNode->getName())->setRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
 		curNode = curNode->getNextNode();
 	}
+
+
+	if(mFrame - cur_action_start_frame <= 10)
+	{
+		if(!first_call)
+		{
+			double ratio = (mFrame - cur_action_start_frame)/10.0;
+			Eigen::VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_position * (1-ratio);
+			warped_position.segment(0,3) = worldSkel->getPositions().segment(0,3);
+	
+			worldSkel->setPositions(warped_position);
+		}
+		else
+		{
+			if(mFrame - cur_action_start_frame == 10)
+				first_call = false;
+		}
+		
+	}
+	// cout<<mFrame<<endl;
 	renderScene();
-	mFrame++;
-	mFrame %= bvhParser->frames;
+	if(play)
+		mFrame++;
+	
  	glutTimerFunc(mDisplayTimeout, Timer,1);
 }
 void passiveProcessMouse(int x, int y)
@@ -346,7 +581,7 @@ void processMouse(int button, int state, int x, int y)
 	renderScene();
 }
 
- void resize(int width, int height) {
+void resize(int width, int height) {
  	if (((float)width) / height < aspectRatio) {
 		glViewport(0, 0, height * aspectRatio, height);
 		glutReshapeWindow(int(height * aspectRatio), height);
@@ -360,7 +595,7 @@ void processMouse(int button, int state, int x, int y)
 	glLoadIdentity();
 	gluPerspective(fovy,
 		aspectRatio,
-		0.1f, 100.0f);
+		0.1f, 150.0f);
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	gluLookAt(eye[0], eye[1], eye[2],
@@ -420,6 +655,7 @@ void rotateView(int x, int y)
 
 	viewUp = Eigen::AngleAxisd(angle, axis) * prev_viewUp;
 }
+
 void translateView(int x, int y)
 {
 	float width = glutGet(GLUT_WINDOW_WIDTH);
@@ -619,9 +855,11 @@ void pressedProcessMouse(int x, int y) {
 	{
 		rotateView(x, y);
 	}
+
+	//blocked view translate
 	if(mouseViewTranslate_ON)
 	{
-		translateView(x, y);
+		// translateView(x, y);
 	}
 	// if(mouseObjectTranslate_ON)
 	// {
@@ -638,6 +876,27 @@ void keyboard(unsigned char key, int x, int y)
 {
 	switch(key)
 	{
+		case 'w':
+			CONTROL_front_stack++;
+		break;
+		case 'a':
+			CONTROL_leftTurn_stack++;
+		break;
+		case 's':
+			CONTROL_front_stack--;
+		break;
+		case 'd':
+			CONTROL_leftTurn_stack--;
+		break;
+		case ' ':
+			play = !play;
+		break;
+		case '[':
+			mFrame--;
+		break;
+		case ']':
+			mFrame++;
+		break;
 		case 27:
 		exit(0);
 		break;
@@ -649,9 +908,9 @@ void keyboard(unsigned char key, int x, int y)
 SkeletonPtr createBVHSkeleton(const char* path)
 {
 	SkeletonPtr skel = std::shared_ptr<Skeleton>(new Skeleton());
-	bvhParser = new BVHparser(path);
+	bvhmanager = new BVHmanager();
 	MotionNode *curNode;
-	curNode = bvhParser->getRootNode();
+	curNode = bvhmanager->getBVHparser("walk_normal")->getRootNode();
 	BodyNodePtr rootBody = std::shared_ptr<BodyNode>(new BodyNode(curNode->getName()));
 	rootBody->setShape(0.15, 0.15, 0.15);
 	skel->setRootBodyNode(rootBody);
@@ -686,18 +945,34 @@ SkeletonPtr createBVHSkeleton(const char* path)
 		skel->addBodyNode(newBody);
 		curNode = curNode->getNextNode();
 	}
-	mDisplayTimeout = 1000.0*bvhParser->frameTime;
+	mDisplayTimeout = 1000.0*bvhmanager->getBVHparser("walk_normal")->frameTime;
 	return skel;
 }
-
-/// View Up should match to our eye, viewCener
-void initViewUP()
+void initMotionState()
 {
-	Eigen::Vector3d viewRight = (viewCenter - eye).normalized().cross(viewUp);
-	viewRight.normalize();
-	viewUp = viewRight.cross((viewCenter - eye).normalized());
+	MOTION_STATE = MOTION_STATE_STOP;
+	prev_action ="stop";
+	prev_action_end_frame = 641;
+	cur_action ="stop";
+	cur_action_end_frame = 641;
+	cur_action_start_frame = 641;
+	root_translation_displacement 
+	= - Eigen::Vector3d(
+		bvhmanager->getBVHparser("stop")->getRootNode()
+		->data[cur_action_start_frame][0]*scale,
+		0.0,
+		bvhmanager->getBVHparser("stop")->getRootNode()
+		->data[cur_action_start_frame][2]*scale);
+	root_rotation_displacement
+	=- Eigen::Vector3d(
+		0,
+		bvhmanager->getBVHparser("stop")->getRootNode()
+		->data[cur_action_start_frame][4]*scale,
+		0);
+	//we have to execute SetActionFromStack
+	mFrame  = 642;
+	prev_action_end_frame_position = worldSkel->getPositions();
 }
-
 
 int main(int argc, char **argv) {
 
@@ -706,12 +981,15 @@ int main(int argc, char **argv) {
 	glutInitDisplayMode(GLUT_DEPTH | GLUT_SINGLE | GLUT_RGBA);
 	glutInitWindowPosition(200, 200);
 	glutInitWindowSize(1260, 760);
-	glutCreateWindow("Advanced Animation hw 3");
+	glutCreateWindow("Advanced Animation hw 4");
 	initViewUP();
 	mFrame = 0;
-	worldSkel = createBVHSkeleton("../data/Trial001.bvh");
+	if(argc == 1)
+		worldSkel = createBVHSkeleton("../MotionData2/mrl/walk_fast_stright.bvh");
+	else
+		worldSkel = createBVHSkeleton(argv[1]);
 	// hideObjTrackball();
-
+	initMotionState();
 	// register callbacks
 	glutDisplayFunc(renderScene);
 	glutReshapeFunc(resize);

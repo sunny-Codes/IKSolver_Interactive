@@ -26,6 +26,8 @@ private:
 	std::vector<BodyNodePtr> BodyNodes;
 };
 typedef std::shared_ptr<Skeleton> SkeletonPtr;
+Eigen::Vector3d QuaternionToAngleAxis(Eigen::Quaterniond qt);
+Eigen::Quaterniond AngleAxisToQuaternion(Eigen::Vector3d angleAxis);
 
 
 #endif	//SKELETON_H

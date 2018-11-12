@@ -327,7 +327,7 @@ BVHparser::BVHparser(const char* path)
 		}
 		*/
 		float theta;
-		theta = 2 * atan2(sqrt(q.x()*q.x() + q.y()*q.y() + q.z()*q.z()), q.w());
+		theta = atan2(sqrt(q.x()*q.x() + q.y()*q.y() + q.z()*q.z()), q.w());
 		//cout<< q.w()*q.w() + q.x()*q.x() + q.y()*q.y() + q.z()*q.z() <<endl;
 		Eigen::Vector3d root_axis = Eigen::Vector3d(q.x(), q.y(), q.z());
 		root_axis.normalize();
@@ -365,7 +365,7 @@ BVHparser::BVHparser(const char* path)
 
 			//euler = q.toRotationMatrix().eulerAngles(0, 1, 2);		//#######changed######
 			float theta;
-			theta = 2 * atan2(sqrt(q.x()*q.x() + q.y()*q.y() + q.z()*q.z()), q.w());
+			theta = atan2(sqrt(q.x()*q.x() + q.y()*q.y() + q.z()*q.z()), q.w());
 			//cout<< q.w()*q.w() + q.x()*q.x() + q.y()*q.y() + q.z()*q.z() <<endl;
 			Eigen::Vector3d root_axis = Eigen::Vector3d(q.x(), q.y(), q.z());
 			root_axis.normalize();
@@ -386,6 +386,11 @@ BVHparser::BVHparser(const char* path)
 MotionNode* BVHparser::getRootNode()
 {
 	return rootNode;
+}
+
+const char* BVHparser::getPath()
+{
+	return mPath;
 }
 
 string bvhpath_2_skelpath_(const char* path)

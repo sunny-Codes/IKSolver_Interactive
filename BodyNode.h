@@ -27,6 +27,7 @@ public:
 	void setWorldTranslation(Eigen::Vector3d translation);
 	void setWorldRotation(Eigen::Matrix3d rotation);
 	void setRotation(Eigen::Matrix3d rotation);
+	void Translate(Eigen::Vector3d translation);
 	Eigen::Isometry3d getTransform();
 	Eigen::Isometry3d getWorldTransform()			{return worldTransform;}
 	bool haveParent()								{return haveParent_;}

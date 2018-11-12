@@ -46,6 +46,14 @@ void BodyNode::setJoint(Eigen::Isometry3d pbtj, Eigen::Isometry3d cbtj)
 	updateWorldTransform();
 }
 
+// only called by root
+void BodyNode::Translate(Eigen::Vector3d translation)
+{
+	if(haveParent())
+		std::cout<<"BodyNode::Translate : wrong use"<<std::	endl;
+	worldTransform.translate(translation);
+}
+
 // Parent have no local transform. So return worldTransform.
 Eigen::Isometry3d BodyNode::getTransform()
 {

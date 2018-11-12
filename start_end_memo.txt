@@ -1,0 +1,28 @@
+(stop -> walk)
+#walk_fast_stright 66 107 (stand -> right foot contact)
+walk_normal_stright 62 100 (stand -> right foot contact)
+
+(walk -> stop)
+walk_normal_stright 588 641 (left foot contact -> stand)
+walk_normal_stright 824 879 (right foot contact -> stand)
+
+(loop walk)
+walk_fast_stright 107 137 (right foot contact)
+walk_fast_stright 122 152 (left foot contact)
+
+walk_normal_stright 100 139 (right foot contact)
+walk_normal_stright 119 158 (left foot contact)
+
+
+walk_slow_stright 170 221 (right foot contact)
+walk_slow_stright 145 196 (left foot contact)
+
+(turn left)
+walk_normal_left_45 119 180 (left foot contact ; right foot contact)
+walk_normal_left_90 96 159 (left foot contact ; right foot contact)
+walk_normal_left_135 100 173 (left foot contact ; right foot contact)
+
+(turn right)
+walk_normal_right_45 84 138 (left foot contact ; right foot contact)
+walk_normal_right_90 91 149 (left foot contact ; right foot contact)
+walk_normal_right_135 96 156 (left foot contact ; right foot contact)

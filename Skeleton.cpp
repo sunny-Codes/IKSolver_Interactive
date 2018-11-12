@@ -32,6 +32,8 @@ void Skeleton::setRootBodyNode(BodyNodePtr rootBodyNode)
 Eigen::Vector3d QuaternionToAngleAxis(Eigen::Quaterniond qt)
 {
 	double angle = atan2(qt.vec().norm(), qt.w());
+	if(qt.w() == 1.0)
+		return Eigen::Vector3d::Zero();
 	return angle * qt.vec().normalized();
 }
 

@@ -878,15 +878,23 @@ void keyboard(unsigned char key, int x, int y)
 	{
 		case 'w':
 			CONTROL_front_stack++;
+			if(CONTROL_front_stack >= 3)
+				CONTROL_front_stack = 3;
 		break;
 		case 'a':
 			CONTROL_leftTurn_stack++;
+			if(CONTROL_leftTurn_stack >= 3)
+				CONTROL_leftTurn_stack = 3;
 		break;
 		case 's':
 			CONTROL_front_stack--;
+			if(CONTROL_front_stack <= 0)
+				CONTROL_front_stack = 0;
 		break;
 		case 'd':
 			CONTROL_leftTurn_stack--;
+			if(CONTROL_leftTurn_stack <= -3)
+				CONTROL_leftTurn_stack = -3;
 		break;
 		case ' ':
 			play = !play;

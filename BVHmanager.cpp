@@ -85,8 +85,8 @@ getStartEndFrame(const char* action, int* start, int* end, int* start_motion_sta
 {
 	if(strcmp(action, "walk_start") == 0)
 	{
-		*start = 66;
-		*end = 107;
+		*start = 62;
+		*end = 99;
 		*start_motion_state = MOTION_STATE_STOP;
 		*end_motion_state = MOTION_STATE_RIGHT_FOOT;
 	}
@@ -128,21 +128,21 @@ getStartEndFrame(const char* action, int* start, int* end, int* start_motion_sta
 	else if(strcmp(action, "walk_fast") == 0)
 	{
 		*start = 107;
-		*end = 137;
+		*end = 135;
 		*start_motion_state = MOTION_STATE_RIGHT_FOOT;
 		*end_motion_state = MOTION_STATE_RIGHT_FOOT;
 	}
 	else if(strcmp(action, "walk_normal") == 0)
 	{
 		*start = 100;
-		*end = 139;
+		*end = 137;
 		*start_motion_state = MOTION_STATE_RIGHT_FOOT;
 		*end_motion_state = MOTION_STATE_RIGHT_FOOT;
 	}
 	else if(strcmp(action, "walk_slow") == 0)
 	{
 		*start = 170;
-		*end = 221;
+		*end = 219;
 		*start_motion_state = MOTION_STATE_RIGHT_FOOT;
 		*end_motion_state = MOTION_STATE_RIGHT_FOOT;
 	}

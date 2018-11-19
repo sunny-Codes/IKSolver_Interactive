@@ -32,7 +32,7 @@ Eigen::Vector3d actual_cur_point, actual_prev_point;
 
 Eigen::VectorXd prev_skel_positions;
 Eigen::Isometry3d prev_skel_transform;
-SkeletonPtr worldSkel;
+Skeleton* worldSkel;
 BVHmanager* bvhmanager;
 float scale = 1.0/20.0;
 int selectedObject = -1;
@@ -602,6 +602,7 @@ void resize(int width, int height) {
 		viewCenter[0], viewCenter[1], viewCenter[2],
 		viewUp[0], viewUp[1], viewUp[2]);
  	glutSwapBuffers();
+ 	glutPostRedisplay();
  }
 
 void rotateView(int x, int y)
@@ -685,7 +686,7 @@ void translateView(int x, int y)
 	eye = prev_eye - (real_diff[0] * viewLeft + real_diff[1] * viewUp);
 }
 
-double lineSearch(SkeletonPtr skel, 
+double lineSearch(Skeleton* skel, 
 				Eigen::VectorXd pos, 
 				Eigen::VectorXd gradient, 
 				double stepSize,
@@ -913,13 +914,13 @@ void keyboard(unsigned char key, int x, int y)
 	}
 }
 
-SkeletonPtr createBVHSkeleton(const char* path)
+Skeleton* createBVHSkeleton(const char* path)
 {
-	SkeletonPtr skel = std::shared_ptr<Skeleton>(new Skeleton());
+	Skeleton* skel = new Skeleton();
 	bvhmanager = new BVHmanager();
 	MotionNode *curNode;
 	curNode = bvhmanager->getBVHparser("walk_normal")->getRootNode();
-	BodyNodePtr rootBody = std::shared_ptr<BodyNode>(new BodyNode(curNode->getName()));
+	BodyNode* rootBody = new BodyNode(curNode->getName());
 	rootBody->setShape(0.15, 0.15, 0.15);
 	skel->setRootBodyNode(rootBody);
 	curNode = curNode->getNextNode();
@@ -930,8 +931,8 @@ SkeletonPtr createBVHSkeleton(const char* path)
 			curNode = curNode->getNextNode();
 			continue;
 		}
-		BodyNodePtr newBody 
-		= std::shared_ptr<BodyNode>(new BodyNode(curNode->getName(),skel->getBodyNode(curNode->getParent()->getName())));
+		BodyNode* newBody 
+		= new BodyNode(curNode->getName(),skel->getBodyNode(curNode->getParent()->getName()));
 		newBody->setShape(
 			fmax(0.15, fabs(curNode->getChilds()[0]->getOffset(0)*scale/2.0)), 
 			fmax(0.15, fabs(curNode->getChilds()[0]->getOffset(1)*scale/2.0)), 

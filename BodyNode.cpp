@@ -1,6 +1,6 @@
 #include "BodyNode.h"
 
-BodyNode::BodyNode(std::string name, std::shared_ptr<BodyNode> parentNode)
+BodyNode::BodyNode(std::string name, BodyNode* parentNode)
 : name(name), parentNode(parentNode)
 {
 	transform.setIdentity();

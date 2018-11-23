@@ -6,7 +6,7 @@ Skeleton::Skeleton()
 {
 }
 
-BodyNodePtr Skeleton::getBodyNode(std::string name)
+BodyNode* Skeleton::getBodyNode(std::string name)
 {
 	for(auto bodyNode : BodyNodes)
 	{
@@ -17,12 +17,12 @@ BodyNodePtr Skeleton::getBodyNode(std::string name)
 	return NULL;
 }
 
-void Skeleton::addBodyNode(BodyNodePtr newNode)
+void Skeleton::addBodyNode(BodyNode* newNode)
 {
 	BodyNodes.push_back(newNode);
 }
 
-void Skeleton::setRootBodyNode(BodyNodePtr rootBodyNode)
+void Skeleton::setRootBodyNode(BodyNode* rootBodyNode)
 {
 	this->rootBodyNode = rootBodyNode;
 	addBodyNode(rootBodyNode);
@@ -44,11 +44,11 @@ Eigen::Quaterniond AngleAxisToQuaternion(Eigen::Vector3d angleAxis)
 	return qt;
 }
 
-Eigen::MatrixXd Skeleton::getJacobian(BodyNodePtr bodyNode, Eigen::Vector3d offset)
+Eigen::MatrixXd Skeleton::getJacobian(BodyNode* bodyNode, Eigen::Vector3d offset)
 {
 	Eigen::MatrixXd jacobian(3, getNumDofs());
 	jacobian.setZero();
-	BodyNodePtr body = getBodyNodes()[0];
+	BodyNode* body = getBodyNodes()[0];
 	//Translation of root joint
 	jacobian.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
 	double h = 1E-3;	//Add h and get the difference -> numerical gradient
@@ -78,7 +78,7 @@ Eigen::MatrixXd Skeleton::getJacobian(BodyNodePtr bodyNode, Eigen::Vector3d offs
 		int dof = 3;
 		qt = body->getTransform().linear();
 		angleAxis_qt = QuaternionToAngleAxis(qt);
-		BodyNodePtr targetBody = bodyNode;
+		BodyNode* targetBody = bodyNode;
 		bool isTargetParent = false;
 		while(1)
 		{

@@ -8,24 +8,24 @@ class Skeleton
 {
 public:
 	Skeleton();
-	BodyNodePtr getRootBodyNode()					{return rootBodyNode;}
-	void setRootBodyNode(BodyNodePtr rootBodyNode);
-	BodyNodePtr getBodyNode(std::string name);
-	BodyNodePtr getBodyNode(int index)				{return BodyNodes[index];}
-	std::vector<BodyNodePtr> getBodyNodes()			{return BodyNodes;}
-	void addBodyNode(BodyNodePtr newNode);
+	BodyNode* getRootBodyNode()					{return rootBodyNode;}
+	void setRootBodyNode(BodyNode* rootBodyNode);
+	BodyNode* getBodyNode(std::string name);
+	BodyNode* getBodyNode(int index)				{return BodyNodes[index];}
+	std::vector<BodyNode*> getBodyNodes()			{return BodyNodes;}
+	void addBodyNode(BodyNode* newNode);
 	int getNumBodyNodes()							{return BodyNodes.size();}
 	int getNumDofs()							{return BodyNodes.size()*3+3;}
 	void setPositions(Eigen::VectorXd pos);
 	void setPosition(int index, double value);
 	Eigen::VectorXd getPositions();
-	Eigen::MatrixXd getJacobian(BodyNodePtr bodyNode, Eigen::Vector3d offset);
+	Eigen::MatrixXd getJacobian(BodyNode* bodyNode, Eigen::Vector3d offset);
 
 private:
-	BodyNodePtr rootBodyNode;
-	std::vector<BodyNodePtr> BodyNodes;
+	BodyNode* rootBodyNode;
+	std::vector<BodyNode*> BodyNodes;
 };
-typedef std::shared_ptr<Skeleton> SkeletonPtr;
+// typedef std::shared_ptr<Skeleton> SkeletonPtr;
 Eigen::Vector3d QuaternionToAngleAxis(Eigen::Quaterniond qt);
 Eigen::Quaterniond AngleAxisToQuaternion(Eigen::Vector3d angleAxis);
 

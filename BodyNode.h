@@ -3,7 +3,6 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string>
-#include <memory>
 #include <Eigen/Dense>
 typedef struct Box_ 
 {
@@ -21,7 +20,7 @@ typedef struct Joint_
 class BodyNode
 {
 public:
-	BodyNode(std::string name, std::shared_ptr<BodyNode> parentNode);
+	BodyNode(std::string name, BodyNode* parentNode);
 	BodyNode(std::string name);
 	void setTransform(Eigen::Isometry3d transform_)	{transform = transform_;}
 	void setWorldTranslation(Eigen::Vector3d translation);
@@ -31,7 +30,7 @@ public:
 	Eigen::Isometry3d getTransform();
 	Eigen::Isometry3d getWorldTransform()			{return worldTransform;}
 	bool haveParent()								{return haveParent_;}
-	std::shared_ptr<BodyNode> getParent()			{return parentNode;}
+	BodyNode* getParent()			{return parentNode;}
 	std::string getName()							{return name;}
 	void setShape(float width, float height, float depth);
 	Box getShape()									{return boxShape;}
@@ -40,7 +39,7 @@ public:
 	void updateWorldTransform();
 private:
 	std::string name;
-	std::shared_ptr<BodyNode> parentNode;
+	BodyNode* parentNode;
 	Eigen::Isometry3d worldTransform;
 	Eigen::Isometry3d transform;
 	Joint joint;
@@ -48,7 +47,6 @@ private:
 	bool haveParent_;
 	Box boxShape;
 };
-typedef std::shared_ptr<BodyNode> BodyNodePtr;
 
 
 #endif	//BODYNODE_H

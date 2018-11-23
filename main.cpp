@@ -390,7 +390,8 @@ SetActionFromStack()
 	cur_action_end_frame = end_frame;
 	MOTION_STATE = end_motion_state;
 
-	root_translation_displacement
+	/*
+    root_translation_displacement
 	= worldSkel->getPositions().segment(0,3)
 	- Eigen::Vector3d(
 		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
@@ -399,8 +400,13 @@ SetActionFromStack()
 	->data[start_frame][1]*scale,
 		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
 	->data[start_frame][2]*scale);
-	root_translation_displacement.y() = 0.0;
+	*/
+    MotionSegment * motionSegment= bvhmanager->getMotionSegment(cur_action.c_str());
+    Eigen::Vector3d root_start_pos= motionSegment->get_start_position(0) *scale;
+    root_translation_displacement= worldSkel->getPositions().segment(0,3)- root_start_pos;
+    root_translation_displacement.y() = 0.0;
 
+    /*
 	root_rotation_displacement = 
 	QuaternionToAngleAxis(Eigen::Quaterniond(AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3)))
 	* AngleAxisToQuaternion(Eigen::Vector3d(
@@ -410,8 +416,12 @@ SetActionFromStack()
 	->data[start_frame][4],
 		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
 	->data[start_frame][5])).inverse());
-
-	root_rotation_displacement.x() = 0;
+    */
+    Eigen::Vector3d root_start_rot= motionSegment->get_start_rotation(0);
+    Quaternionf root_rotation_displacement_quat = 
+        AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3))*AngleAxisToQuaternion (root_start_rot).inverse();
+    root_rotation_displacement= QuaternionToAngleAxis(root_rotation_displacement_quat);
+    root_rotation_displacement.x() = 0;
 	root_rotation_displacement.z() = 0;
 }
 
@@ -423,21 +433,35 @@ void Timer(int value)
 		SetActionFromStack();
 	}
 	// cout<<"Timer prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
-	MotionNode* curNode = bvhmanager->getBVHparser(cur_action.c_str())->getRootNode();
-	Eigen::Vector3d rotation;
-	rotation = Eigen::Vector3d(curNode->data[mFrame][3], curNode->data[mFrame][4], curNode->data[mFrame][5]);
-	Eigen::Vector3d start_frame_position 
+
+    //MotionNode* curNode = bvhmanager->getBVHparser(cur_action.c_str())->getRootNode();
+	
+    MotionSegment* motionSegment= bvhmanager->getMotionSegment(cur_action.c_str());
+    Eigen::Vector3d root_rotation= motionSegment->get_current_rotation(0, mFrame);
+	//rotation = Eigen::Vector3d(curNode->data[mFrame][3], curNode->data[mFrame][4], curNode->data[mFrame][5]);
+
+    Eigen::Vector3d root_start_frame_position = scale* motionSegment->get_start_position(0);
+    Eigen::Vector3d root_cur_frame_position = scale* motionSegment->get_current_position(0, mFrame);
+	/*
+    Eigen::Vector3d start_frame_position 
 	= Eigen::Vector3d(curNode->data[cur_action_start_frame][0]*scale, 
 		curNode->data[cur_action_start_frame][1]*scale, 
 		curNode->data[cur_action_start_frame][2]*scale);
 	Eigen::Vector3d cur_frame_position = Eigen::Vector3d(curNode->data[mFrame][0]*scale, curNode->data[mFrame][1]*scale, curNode->data[mFrame][2]*scale);
-	worldSkel->getRootBodyNode()
+	*/
+    Eigen::Vector3d root_position_displacement= root_cur_frame_position- root_start_frame_position;
+    Eigen::MatrixXd root_rotation_displacement_M= AngleAxisToQuaternion(root_rotation_displacement).toRotationMatrix();
+    worldSkel->getRootBodyNode()->setWorldTranslation(
+            root_start_frame_position+ root_rotatoin_displacement_M*root_position_displacement);
+    /*
+    worldSkel->getRootBodyNode()
 	->setWorldTranslation(
 		start_frame_position +
 		AngleAxisToQuaternion(root_rotation_displacement).toRotationMatrix()*
 		Eigen::Vector3d(cur_frame_position - start_frame_position));
-	worldSkel->getRootBodyNode()
-	->setWorldRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
+	*/
+    worldSkel->getRootBodyNode()
+	->setWorldRotation(AngleAxisToQuaternion(root_rotation).toRotationMatrix());
 
 	// keep the root position by root_translation_displacement
 

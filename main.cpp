@@ -11,12 +11,13 @@
 #define MOTION_STATE_LEFT_FOOT 11
 #define MOTION_STATE_RIGHT_FOOT 12
 using namespace std;
+using namespace Eigen;
 
 float fovy = 50.0f;
 float aspectRatio = 1260.0f / 760.0f;
-Eigen::Vector3d eye(0.0f, 10.0f, -20.0f);
-Eigen::Vector3d viewCenter(0.0f, 0.0f, 0.0f);
-Eigen::Vector3d viewUp(0.0f, 1.0f, 0.0f);
+Vector3d eye(0.0f, 10.0f, -20.0f);
+Vector3d viewCenter(0.0f, 0.0f, 0.0f);
+Vector3d viewUp(0.0f, 1.0f, 0.0f);
 
 float px, py;
 bool mouseViewRotate_ON = false;
@@ -24,22 +25,23 @@ bool mouseViewTranslate_ON = false;
 bool mouseObjectRotate_ON = false;
 bool mouseObjectTranslate_ON = false;
 
-Eigen::Vector3d prev_eye = eye;
-Eigen::Vector3d prev_viewUp = viewUp;
-Eigen::Vector3d prev_viewCenter = viewCenter;
-Eigen::Vector3d axis;
-Eigen::Vector3d actual_cur_point, actual_prev_point;
+Vector3d prev_eye = eye;
+Vector3d prev_viewUp = viewUp;
+Vector3d prev_viewCenter = viewCenter;
+Vector3d axis;
+Vector3d actual_cur_point, actual_prev_point;
 
-Eigen::VectorXd prev_skel_positions;
-Eigen::Isometry3d prev_skel_transform;
+VectorXd prev_skel_positions;
+Isometry3d prev_skel_transform;
 Skeleton* worldSkel;
 BVHmanager* bvhmanager;
+
 float scale = 1.0/20.0;
 int selectedObject = -1;
 int selectingObject = -1;
 
-Eigen::Isometry3d obj_trackBall_transform = Eigen::Isometry3d::Identity();
-Eigen::Isometry3d prev_obj_trackBall_transform = Eigen::Isometry3d::Identity();
+Isometry3d obj_trackBall_transform = Isometry3d::Identity();
+Isometry3d prev_obj_trackBall_transform = Isometry3d::Identity();
 double trackball_radius = 1.0;
 
 int mFrame;
@@ -52,17 +54,20 @@ bool play = true;
 
 double remain_frame = 0;
 
-string prev_action ="";	//action played before
+MotionSegment * prevMotionSegment;
+MotionSegment * curMotionSegment;
+
+//string prev_action ="";	//action played before
 int prev_action_end_frame;
-string cur_action ="";	//action currently playing
-int cur_action_end_frame;
-int cur_action_start_frame;
+//string cur_action ="";	//action currently playing
+//int curMotionSegment->get_end();
+//int cur_action_start_frame;
 
 int MOTION_STATE = MOTION_STATE_STOP;
 
-Eigen::Vector3d root_rotation_displacement;
-Eigen::Vector3d root_translation_displacement;
-Eigen::VectorXd prev_action_end_frame_position;
+Vector3d interMotion_root_rotation_displacement;
+Vector3d interMotion_root_translation_displacement;
+VectorXd prev_action_end_frame_position;
 
 bool first_call = true;
 using namespace std;
@@ -70,7 +75,7 @@ using namespace std;
 /// View Up should match to our eye, viewCener
 void initViewUP()
 {
-	Eigen::Vector3d viewRight = (viewCenter - eye).normalized().cross(viewUp);
+	Vector3d viewRight = (viewCenter - eye).normalized().cross(viewUp);
 	viewRight.normalize();
 	viewUp = viewRight.cross((viewCenter - eye).normalized());
 }
@@ -291,9 +296,9 @@ void renderScene(void)
  	glutSwapBuffers();
 }
 
-void TranslateViewCenter_Eye(Eigen::Vector3d pos)
+void TranslateViewCenter_Eye(Vector3d pos)
 {
-	Eigen::Vector3d temp = eye - viewCenter;
+	Vector3d temp = eye - viewCenter;
 	viewCenter = pos;
 	eye = viewCenter + temp;
 	initViewUP();
@@ -339,145 +344,96 @@ StackToAction()
 void
 SetActionFromStack()
 {
-	int start_frame, end_frame;
-	int start_motion_state, end_motion_state;
-	bvhmanager->getStartEndFrame(StackToAction().c_str(), 
-		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
-	if(MOTION_STATE == start_motion_state)
+    MotionSegment * StackMotion= bvhmanager->getMotionSegment(StackToAction().c_str());
+
+    if(MOTION_STATE == StackMotion->get_start_state())
 	{
-		cout<<cur_action<<endl;
+		cout<<curMotionSegment->get_motion_name()<<endl;
 		cout<<endl;
-		prev_action = cur_action;
-		cur_action = StackToAction();
-		
+
+		prevMotionSegment= curMotionSegment;
+		curMotionSegment= StackMotion;
+
 		CONTROL_leftTurn_stack = 0;	//we will turn. so reset the left turn stack.
 	}
 	else if(MOTION_STATE == MOTION_STATE_LEFT_FOOT 
-		&& start_motion_state == MOTION_STATE_RIGHT_FOOT)
+		&& StackMotion->get_start_state() == MOTION_STATE_RIGHT_FOOT)
 	{
-		prev_action = cur_action;
-		cur_action = "walk_left_to_right";
-		bvhmanager->getStartEndFrame("walk_left_to_right", 
-		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
+		prevMotionSegment= curMotionSegment;
+		curMotionSegment= bvhmanager->getMotionSegment("walk_left_to_right");
 	}
 	else if(MOTION_STATE == MOTION_STATE_RIGHT_FOOT 
-		&& start_motion_state == MOTION_STATE_LEFT_FOOT)
+		&& StackMotion->get_start_state() == MOTION_STATE_LEFT_FOOT)
 	{
-		prev_action = cur_action;
-		cur_action = "walk_right_to_left";
-		bvhmanager->getStartEndFrame("walk_right_to_left", 
-		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
+		prevMotionSegment= curMotionSegment;
+		curMotionSegment= bvhmanager->getMotionSegment("walk_right_to_left");
 	}
 	// if curent step is stop and we want to turn left, we add walk_start to move it. 
 	else if(MOTION_STATE == MOTION_STATE_STOP 
-		&& start_motion_state != MOTION_STATE_STOP)
+		&& StackMotion->get_start_state() != MOTION_STATE_STOP)
 	{
-		prev_action = cur_action;
-		cur_action = "walk_start";
-		bvhmanager->getStartEndFrame("walk_start", 
-		&start_frame, &end_frame, &start_motion_state, &end_motion_state);
-	
+		prevMotionSegment= curMotionSegment;
+		curMotionSegment= bvhmanager->getMotionSegment("walk_start");
 	}
 	else
 	{
 		cout<<"stack : "<<CONTROL_front_stack<<endl;
-		cout<<"why else ? prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
+		//cout<<"why else ? prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
+		cout<<"why else ? prev/cur action is "<<prevMotionSegment->get_motion_name()<<" / "<<curMotionSegment->get_motion_name()<<endl;
 	}
+
 	prev_action_end_frame_position = worldSkel->getPositions();
 
-	mFrame = start_frame;
-	cur_action_start_frame = start_frame;
-	cur_action_end_frame = end_frame;
-	MOTION_STATE = end_motion_state;
+	mFrame = curMotionSegment->get_start(); //start_frame;
+	MOTION_STATE = curMotionSegment->get_end_state(); //end_motion_state;
 
-	/*
-    root_translation_displacement
-	= worldSkel->getPositions().segment(0,3)
-	- Eigen::Vector3d(
-		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
-	->data[start_frame][0]*scale,
-		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
-	->data[start_frame][1]*scale,
-		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
-	->data[start_frame][2]*scale);
-	*/
-    MotionSegment * motionSegment= bvhmanager->getMotionSegment(cur_action.c_str());
-    Eigen::Vector3d root_start_pos= motionSegment->get_start_position(0) *scale;
-    root_translation_displacement= worldSkel->getPositions().segment(0,3)- root_start_pos;
-    root_translation_displacement.y() = 0.0;
+	// set interMotion_root_translation/rotation_displacement
+    Vector3d root_start_pos= curMotionSegment->get_start_position(0) *scale;
+    Vector3d root_current_pos= worldSkel->getPositions().segment(0,3); // == prevMotionSegment->get_end_position(0)*scale;
+    interMotion_root_translation_displacement=root_current_pos - root_start_pos;
+    interMotion_root_translation_displacement.y() = 0.0;
 
-    /*
-	root_rotation_displacement = 
-	QuaternionToAngleAxis(Eigen::Quaterniond(AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3)))
-	* AngleAxisToQuaternion(Eigen::Vector3d(
-		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
-	->data[start_frame][3],
-		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
-	->data[start_frame][4],
-		bvhmanager->getBVHparser(cur_action.c_str())->getRootNode()
-	->data[start_frame][5])).inverse());
-    */
-    Eigen::Vector3d root_start_rot= motionSegment->get_start_rotation(0);
-    Quaternionf root_rotation_displacement_quat = 
-        AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3))*AngleAxisToQuaternion (root_start_rot).inverse();
-    root_rotation_displacement= QuaternionToAngleAxis(root_rotation_displacement_quat);
-    root_rotation_displacement.x() = 0;
-	root_rotation_displacement.z() = 0;
+    Quaterniond root_start_rot= AngleAxisToQuaternion(curMotionSegment->get_start_rotation(0));
+    Quaterniond root_current_rot= AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3));
+    Quaterniond root_rotation_displacement_quat = root_current_rot* root_start_rot.inverse();
+
+    interMotion_root_rotation_displacement= QuaternionToAngleAxis(root_rotation_displacement_quat);
+    interMotion_root_rotation_displacement.x() = 0;
+    interMotion_root_rotation_displacement.z() = 0;
 }
 
 /// called every frameTime sec.
 void Timer(int value)
 {
-	if(cur_action_end_frame < mFrame)
+	if(curMotionSegment->get_end() < mFrame)
 	{
 		SetActionFromStack();
 	}
-	// cout<<"Timer prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
 
-    //MotionNode* curNode = bvhmanager->getBVHparser(cur_action.c_str())->getRootNode();
-	
-    MotionSegment* motionSegment= bvhmanager->getMotionSegment(cur_action.c_str());
-    Eigen::Vector3d root_rotation= motionSegment->get_current_rotation(0, mFrame);
-	//rotation = Eigen::Vector3d(curNode->data[mFrame][3], curNode->data[mFrame][4], curNode->data[mFrame][5]);
+	// root align
+    Vector3d root_start_frame_position = scale* curMotionSegment->get_start_position(0);
+    Vector3d root_cur_frame_position = scale* curMotionSegment->get_current_position(0, mFrame);
+    Vector3d intraMotion_root_position_displacement= root_cur_frame_position- root_start_frame_position;
 
-    Eigen::Vector3d root_start_frame_position = scale* motionSegment->get_start_position(0);
-    Eigen::Vector3d root_cur_frame_position = scale* motionSegment->get_current_position(0, mFrame);
-	/*
-    Eigen::Vector3d start_frame_position 
-	= Eigen::Vector3d(curNode->data[cur_action_start_frame][0]*scale, 
-		curNode->data[cur_action_start_frame][1]*scale, 
-		curNode->data[cur_action_start_frame][2]*scale);
-	Eigen::Vector3d cur_frame_position = Eigen::Vector3d(curNode->data[mFrame][0]*scale, curNode->data[mFrame][1]*scale, curNode->data[mFrame][2]*scale);
-	*/
-    Eigen::Vector3d root_position_displacement= root_cur_frame_position- root_start_frame_position;
-    Eigen::MatrixXd root_rotation_displacement_M= AngleAxisToQuaternion(root_rotation_displacement).toRotationMatrix();
-    worldSkel->getRootBodyNode()->setWorldTranslation(
-            root_start_frame_position+ root_rotatoin_displacement_M*root_position_displacement);
-    /*
-    worldSkel->getRootBodyNode()
-	->setWorldTranslation(
-		start_frame_position +
-		AngleAxisToQuaternion(root_rotation_displacement).toRotationMatrix()*
-		Eigen::Vector3d(cur_frame_position - start_frame_position));
-	*/
-    worldSkel->getRootBodyNode()
-	->setWorldRotation(AngleAxisToQuaternion(root_rotation).toRotationMatrix());
+    Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
 
-	// keep the root position by root_translation_displacement
+    Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
+    //Matrix3d newWorldTranslation= root_start_frame_position+ interMotion_root_translation_displacement + intraMotion_root_rotation_displacement_M* intraMotion_root_position_displacement;
+    Matrix3d newWorldTranslation= prevMotion_start_position + interMotion_root_rotation_displacement_M* intraMotion_root_position_displacement;
+    Quaterniond newWorldRotation_quat=AngleAxisToQuaternion(root_cur_rotation) * AngleAxisToQuaternion(interMotion_root_rotation_displacement);
 
-	// worldSkel->getRootBodyNode()->Translate(worldSkel->getRootBodyNode()
-	// 	->getWorldTransform().linear().inverse() * root_translation_displacement);
-	// cout<<"translation : "<<root_translation_displacement.transpose()<<endl;
-	// cout<<"rotation : "<<root_rotation_displacement.transpose()<<endl;
+    Vector3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
+    worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
+    worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
 
-	Eigen::VectorXd displaced_position = worldSkel->getPositions();
+/*	VectorXd displaced_position = worldSkel->getPositions();
 
 	displaced_position.segment(3,3) += root_rotation_displacement;
 
 	displaced_position.segment(0,3) += root_translation_displacement;
 
 	worldSkel->setPositions(displaced_position);
-
+*/
 	TranslateViewCenter_Eye(worldSkel->getPositions().segment(0,3));
 
 
@@ -489,7 +445,7 @@ void Timer(int value)
 			curNode = curNode->getNextNode();
 			continue;
 		}
-		rotation = Eigen::Vector3d(curNode->data[mFrame][0], curNode->data[mFrame][1], curNode->data[mFrame][2]);
+		rotation = Vector3d(curNode->data[mFrame][0], curNode->data[mFrame][1], curNode->data[mFrame][2]);
 		worldSkel->getBodyNode(curNode->getName())->setRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
 		curNode = curNode->getNextNode();
 	}
@@ -500,7 +456,7 @@ void Timer(int value)
 		if(!first_call)
 		{
 			double ratio = (mFrame - cur_action_start_frame)/10.0;
-			Eigen::VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_position * (1-ratio);
+			VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_position * (1-ratio);
 			warped_position.segment(0,3) = worldSkel->getPositions().segment(0,3);
 	
 			worldSkel->setPositions(warped_position);
@@ -634,7 +590,7 @@ void rotateView(int x, int y)
 	float width = glutGet(GLUT_WINDOW_WIDTH);
 	float height = glutGet(GLUT_WINDOW_HEIGHT);
 	float pixel_radius = min(width, height) / 2.0;
-	Eigen::Vector3d normed_cur_point, normed_prev_point;
+	Vector3d normed_cur_point, normed_prev_point;
 
 	normed_cur_point.setZero();
 	normed_cur_point[0] = -(width / 2.0f - x) / pixel_radius;
@@ -658,10 +614,10 @@ void rotateView(int x, int y)
 		= sqrt(1.0f - normed_prev_point[0]*normed_prev_point[0]-normed_prev_point[1]*normed_prev_point[1]);
 	}
 
-	Eigen::Vector3d y_cord = prev_viewUp;
-	Eigen::Vector3d z_cord = (prev_eye-viewCenter).normalized();
-	Eigen::Vector3d x_cord = y_cord.cross(z_cord).normalized();
-	Eigen::Matrix3d transform;
+	Vector3d y_cord = prev_viewUp;
+	Vector3d z_cord = (prev_eye-viewCenter).normalized();
+	Vector3d x_cord = y_cord.cross(z_cord).normalized();
+	Matrix3d transform;
 
 	transform.block<3,1>(0,0) = x_cord;
 	transform.block<3,1>(0,1) = y_cord;
@@ -673,12 +629,12 @@ void rotateView(int x, int y)
 	axis = (actual_prev_point.cross(actual_cur_point)).normalized();
 
 	float angle = -atan2(actual_prev_point.cross(actual_cur_point).norm(), actual_prev_point.dot(actual_cur_point));
-	Eigen::Vector3d trackball_center = viewCenter;
+	Vector3d trackball_center = viewCenter;
 	eye = prev_eye - trackball_center;
-	eye = Eigen::AngleAxisd(angle, axis) * eye;
+	eye = AngleAxisd(angle, axis) * eye;
 	eye = eye + trackball_center;
 
-	viewUp = Eigen::AngleAxisd(angle, axis) * prev_viewUp;
+	viewUp = AngleAxisd(angle, axis) * prev_viewUp;
 }
 
 void translateView(int x, int y)
@@ -686,8 +642,8 @@ void translateView(int x, int y)
 	float width = glutGet(GLUT_WINDOW_WIDTH);
 	float height = glutGet(GLUT_WINDOW_HEIGHT);
 	float pixel_radius = min(width, height) / 2.0;
-	Eigen::Vector2d normed_cur_point, normed_prev_point, normed_diff;
-	Eigen::Vector2d real_diff;
+	Vector2d normed_cur_point, normed_prev_point, normed_diff;
+	Vector2d real_diff;
 
 	normed_cur_point[0] = (width / 2.0f - x) / (width/2.0);
 	normed_cur_point[1] = (height / 2.0f - y) / (height/2.0);
@@ -701,7 +657,7 @@ void translateView(int x, int y)
 	real_diff[0] = normed_diff[0] * viewDistance * tan(fovy*M_PI/180.0/2.0) * aspectRatio;
 
 
-	Eigen::Vector3d viewLeft;
+	Vector3d viewLeft;
 	viewLeft = (viewUp).normalized().cross(viewCenter - eye);
 	// The norm of viewRight is already 1. For safe implement, we will normailze.
 	viewLeft.normalize();
@@ -711,19 +667,19 @@ void translateView(int x, int y)
 }
 
 double lineSearch(Skeleton* skel, 
-				Eigen::VectorXd pos, 
-				Eigen::VectorXd gradient, 
+				VectorXd pos,
+				VectorXd gradient,
 				double stepSize,
 				int sel_ob,
-				Eigen::Vector3d offset,
-				Eigen::Vector3d targetPosition)
+				Vector3d offset,
+				Vector3d targetPosition)
 {
-	Eigen::VectorXd prev_pos = pos;
-	Eigen::Vector3d prev_vec = targetPosition - skel->getBodyNode(sel_ob)->getWorldTransform()*offset;
+	VectorXd prev_pos = pos;
+	Vector3d prev_vec = targetPosition - skel->getBodyNode(sel_ob)->getWorldTransform()*offset;
 	prev_vec.normalize();
 	pos += gradient * stepSize;
 	skel->setPositions(pos);
-	Eigen::Vector3d cur_vec = targetPosition - skel->getBodyNode(sel_ob)->getWorldTransform()*offset;
+	Vector3d cur_vec = targetPosition - skel->getBodyNode(sel_ob)->getWorldTransform()*offset;
 	cur_vec.normalize();
 	skel->setPositions(prev_pos);
 	if(prev_vec.dot(cur_vec) < cos(M_PI/2.0 * 0.2))
@@ -739,9 +695,9 @@ void solveJacobianIK_translation(int x, int y)
 	float height = glutGet(GLUT_WINDOW_HEIGHT);
 	float pixel_radius = min(width, height) / 2.0;
 	/// normed point -> point on the screen x : -1.0 ~ 1.0, y : -1.0 ~ 1.0
-	Eigen::Vector2d normed_cur_point, normed_prev_point, normed_diff;
+	Vector2d normed_cur_point, normed_prev_point, normed_diff;
 	/// real_diff -> point on the picked plane
-	Eigen::Vector2d real_diff;
+	Vector2d real_diff;
 
 	normed_cur_point[0] = (width / 2.0f - x) / (width/2.0);
 	normed_cur_point[1] = (height / 2.0f - y) / (height/2.0);
@@ -750,34 +706,34 @@ void solveJacobianIK_translation(int x, int y)
 
 	normed_diff = normed_cur_point - normed_prev_point;
 
-	Eigen::Vector3d obj_center = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
+	Vector3d obj_center = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
 	double viewDistance = (obj_center- eye).normalized().dot(worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation()- eye);
 	real_diff[1] = normed_diff[1] * viewDistance * tan(fovy*M_PI/180.0/2.0) ;
 	real_diff[0] = normed_diff[0] * viewDistance * tan(fovy*M_PI/180.0/2.0) * aspectRatio;
 
 
-	Eigen::Vector3d viewLeft;
+	Vector3d viewLeft;
 	viewLeft = (viewUp).normalized().cross((viewCenter - eye).normalized());
 	// The norm of viewRight is already 1. For safe implement, we will normailze.
 	viewLeft.normalize();
-	Eigen::Vector3d real_diff_3d;
+	Vector3d real_diff_3d;
 	real_diff_3d = prev_viewCenter + real_diff[0] * viewLeft + real_diff[1] * (viewUp);
 
 	worldSkel->setPositions(prev_skel_positions);
-	Eigen::Vector3d targetPosition = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation() + real_diff_3d;
+	Vector3d targetPosition = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation() + real_diff_3d;
 
 	int steps = 0;
 	double stepSize = 0.1;
-	Eigen::VectorXd prev_pos, gradient;
+	VectorXd prev_pos, gradient;
 
 	while((targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation()).norm()>1E-4)
 	{
 		stepSize = 0.1;
-		Eigen::VectorXd pos = worldSkel->getPositions();
-		Eigen::MatrixXd jacobian = worldSkel->getJacobian(worldSkel->getBodyNode(selectedObject), Eigen::Vector3d::Zero());
-		Eigen::JacobiSVD<Eigen::MatrixXd> svd(jacobian, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		VectorXd pos = worldSkel->getPositions();
+		MatrixXd jacobian = worldSkel->getJacobian(worldSkel->getBodyNode(selectedObject), Vector3d::Zero());
+		JacobiSVD<MatrixXd> svd(jacobian, ComputeThinU | ComputeThinV);
 		gradient =svd.solve(targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation());
-		stepSize = lineSearch(worldSkel, pos, gradient, stepSize, selectedObject, Eigen::Vector3d::Zero(), targetPosition);
+		stepSize = lineSearch(worldSkel, pos, gradient, stepSize, selectedObject, Vector3d::Zero(), targetPosition);
 		pos += gradient * stepSize;
 		worldSkel->setPositions(pos);
 		steps++;
@@ -790,22 +746,22 @@ void solveJacobianIK_rotation(int x, int y)
 	
 	float width = glutGet(GLUT_WINDOW_WIDTH);
 	float height = glutGet(GLUT_WINDOW_HEIGHT);
-	Eigen::Vector2d normed_cur_point, normed_prev_point, normed_diff;
-	Eigen::Vector2d real_diff;
+	Vector2d normed_cur_point, normed_prev_point, normed_diff;
+	Vector2d real_diff;
 
 	normed_cur_point[0] = (width / 2.0f - x) / (width/2.0);
 	normed_cur_point[1] = (height / 2.0f - y) / (height/2.0);
 	normed_prev_point[0] = (width / 2.0f - px) / (width/2.0);
 	normed_prev_point[1] = (height / 2.0f - py) / (height/2.0);
 	
-	Eigen::Vector3d obj_center = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
+	Vector3d obj_center = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
 
 
 	double viewDistance = (obj_center- eye).normalized().dot(worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation()- eye);
 	
-	Eigen::Vector3d real_cur_point, real_prev_point;
+	Vector3d real_cur_point, real_prev_point;
 
-	Eigen::Vector3d viewLeft;
+	Vector3d viewLeft;
 	viewLeft = (viewUp).normalized().cross((viewCenter - eye).normalized());
 	// The norm of viewRight is already 1. For safe implement, we will normailze.
 	viewLeft.normalize();
@@ -818,7 +774,7 @@ void solveJacobianIK_rotation(int x, int y)
 		+ eye + (viewCenter- eye).normalized()*viewDistance;
 
 
-	Eigen::Vector3d viewZ = (eye-obj_center).normalized();
+	Vector3d viewZ = (eye-obj_center).normalized();
 
 	if((real_prev_point -obj_center).norm()>trackball_radius)
 	{
@@ -835,40 +791,40 @@ void solveJacobianIK_rotation(int x, int y)
 	double cur_point_viewZ = sqrt(trackball_radius*trackball_radius  
 		- (real_cur_point-obj_center).norm()*(real_cur_point-obj_center).norm());
 
-	Eigen::Vector3d real_prev_sphere_point = real_prev_point + prev_point_viewZ*viewZ;
-	Eigen::Vector3d real_cur_sphere_point = real_cur_point + cur_point_viewZ*viewZ;
+	Vector3d real_prev_sphere_point = real_prev_point + prev_point_viewZ*viewZ;
+	Vector3d real_cur_sphere_point = real_cur_point + cur_point_viewZ*viewZ;
 
-	Eigen::Vector3d cur_vec = (real_cur_sphere_point - obj_center).normalized();
-	Eigen::Vector3d prev_vec = (real_prev_sphere_point - obj_center).normalized();
+	Vector3d cur_vec = (real_cur_sphere_point - obj_center).normalized();
+	Vector3d prev_vec = (real_prev_sphere_point - obj_center).normalized();
 
-	Eigen::Vector3d axis = prev_vec.cross(cur_vec);
+	Vector3d axis = prev_vec.cross(cur_vec);
 	double angle = atan2(axis.norm(), prev_vec.dot(cur_vec));
 	axis.normalize();
 
 	worldSkel->getBodyNode(selectedObject)->setRotation(
-			prev_skel_transform.rotation() * Eigen::AngleAxisd(angle, axis).toRotationMatrix());
+			prev_skel_transform.rotation() * AngleAxisd(angle, axis).toRotationMatrix());
 
 	obj_trackBall_transform.linear()=
-		prev_obj_trackBall_transform.rotation() * Eigen::AngleAxisd(angle, axis).toRotationMatrix();
+		prev_obj_trackBall_transform.rotation() * AngleAxisd(angle, axis).toRotationMatrix();
 
-	Eigen::VectorXd curPos = worldSkel->getPositions();
+	VectorXd curPos = worldSkel->getPositions();
 	worldSkel->setPositions(prev_skel_positions);
-	Eigen::Vector3d targetPosition = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
+	Vector3d targetPosition = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
 	worldSkel->setPositions(curPos);
 
 	int steps = 0;
 	double stepSize = 0.1;
-	Eigen::VectorXd prev_pos, gradient;
+	VectorXd prev_pos, gradient;
 	while((targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation()).norm()>1E-4)
 	{
 		stepSize = 0.1;
-		Eigen::VectorXd pos = worldSkel->getPositions();
-		Eigen::MatrixXd jacobian = worldSkel->getJacobian(worldSkel->getBodyNode(selectedObject), Eigen::Vector3d::Zero());
-		jacobian.block<3,3>(0, 3+3*selectedObject) = Eigen::Matrix3d::Zero();
+		VectorXd pos = worldSkel->getPositions();
+		MatrixXd jacobian = worldSkel->getJacobian(worldSkel->getBodyNode(selectedObject), Vector3d::Zero());
+		jacobian.block<3,3>(0, 3+3*selectedObject) = Matrix3d::Zero();
 
-		Eigen::JacobiSVD<Eigen::MatrixXd> svd(jacobian, Eigen::ComputeThinU | Eigen::ComputeThinV);
+		JacobiSVD<MatrixXd> svd(jacobian, ComputeThinU | ComputeThinV);
 		gradient =svd.solve(targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation());
-		stepSize = lineSearch(worldSkel, pos, gradient, stepSize, selectedObject, Eigen::Vector3d::Zero(), targetPosition);
+		stepSize = lineSearch(worldSkel, pos, gradient, stepSize, selectedObject, Vector3d::Zero(), targetPosition);
 		pos += gradient * stepSize;
 		worldSkel->setPositions(pos);
 		steps++;
@@ -934,7 +890,7 @@ Skeleton* createBVHSkeleton(const char* path)
 {
 	Skeleton* skel = new Skeleton();
 	bvhmanager = new BVHmanager();
-	MotionNode *curNode;
+	JointNode *curNode;
 	curNode = bvhmanager->getBVHparser("walk_normal")->getRootNode();
 	BodyNode* rootBody = new BodyNode(curNode->getName());
 	rootBody->setShape(0.15, 0.15, 0.15);
@@ -953,15 +909,15 @@ Skeleton* createBVHSkeleton(const char* path)
 			fmax(0.15, fabs(curNode->getChilds()[0]->getOffset(0)*scale/2.0)), 
 			fmax(0.15, fabs(curNode->getChilds()[0]->getOffset(1)*scale/2.0)), 
 			fmax(0.15, fabs(curNode->getChilds()[0]->getOffset(2)*scale/2.0)));
-		Eigen::Isometry3d pbtj, cbtj;
+		Isometry3d pbtj, cbtj;
 		pbtj.setIdentity();
 		cbtj.setIdentity();
 		pbtj.translation() = newBody->getParent()->getJoint().childBodyToJoint.translation()
-		+ Eigen::Vector3d(
+		+ Vector3d(
 			(curNode->getOffset(0))*scale, 
 			(curNode->getOffset(1))*scale, 
 			(curNode->getOffset(2))*scale);
-		cbtj.translation() = -Eigen::Vector3d(
+		cbtj.translation() = -Vector3d(
 			(curNode->getChilds()[0]->getOffset(0))*scale/2.0, 
 			(curNode->getChilds()[0]->getOffset(1))*scale/2.0, 
 			(curNode->getChilds()[0]->getOffset(2))*scale/2.0);
@@ -976,26 +932,19 @@ Skeleton* createBVHSkeleton(const char* path)
 void initMotionState()
 {
 	MOTION_STATE = MOTION_STATE_STOP;
-	prev_action ="stop";
-	prev_action_end_frame = 641;
-	cur_action ="stop";
-	cur_action_end_frame = 641;
-	cur_action_start_frame = 641;
-	root_translation_displacement 
-	= - Eigen::Vector3d(
-		bvhmanager->getBVHparser("stop")->getRootNode()
-		->data[cur_action_start_frame][0]*scale,
-		0.0,
-		bvhmanager->getBVHparser("stop")->getRootNode()
-		->data[cur_action_start_frame][2]*scale);
-	root_rotation_displacement
-	=- Eigen::Vector3d(
-		0,
-		bvhmanager->getBVHparser("stop")->getRootNode()
-		->data[cur_action_start_frame][4]*scale,
-		0);
-	//we have to execute SetActionFromStack
-	mFrame  = 642;
+
+	prevMotionSegment= bvhmanager->getMotionSegment("stop");
+	curMotionSegment= bvhmanager->getMotionSegment("stop");
+
+	root_translation_displacement = - curMotionSegment->get_start_position(0);
+	root_translation_displacement.y()=0;
+
+	root_rotation_displacement= -curMotionSegment->get_start_rotation(0);
+	root_rotation_displacement.x()=0;
+	root_rotation_displacement.z()=0;
+
+	 //we have to execute SetActionFromStack
+	mFrame  = curMotionSegment->get_start()+1; //642;
 	prev_action_end_frame_position = worldSkel->getPositions();
 }
 

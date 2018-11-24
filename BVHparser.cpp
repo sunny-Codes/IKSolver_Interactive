@@ -15,7 +15,7 @@
 
 using namespace std;
 
-MotionNode::MotionNode()
+JointNode::JointNode()
 {
 	name = "";
 	axisOrder = "";
@@ -23,88 +23,88 @@ MotionNode::MotionNode()
 	isEnd = false;
 	parent = nullptr;
 	next = nullptr;
-	childs = vector<MotionNode*>();
+	childs = vector<JointNode*>();
 	channelNum = 0;
 }
-MotionNode* MotionNode::getParent()
+JointNode* JointNode::getParent()
 {
 	return parent;
 }
-vector<MotionNode*> MotionNode::getChilds()
+vector<JointNode*> JointNode::getChilds()
 {
 	return childs;
 }
-void MotionNode::setParent(MotionNode* pnode)
+void JointNode::setParent(JointNode* pnode)
 {
 	parent = pnode;
 	pnode->addChild(this);
 }
-void MotionNode::addChild(MotionNode* cnode)
+void JointNode::addChild(JointNode* cnode)
 {
 	childs.push_back(cnode);
 }
-void MotionNode::setRoot()
+void JointNode::setRoot()
 {
 	isRoot = true;
 }
-void MotionNode::setEnd()
+void JointNode::setEnd()
 {
 	isEnd = true;
 }
-void MotionNode::setName(string mname)
+void JointNode::setName(string mname)
 {
 	name = mname;
 }
-void MotionNode::setAxisOrder(string maxisOrder)
+void JointNode::setAxisOrder(string maxisOrder)
 {
 	axisOrder = maxisOrder;
 }
-void MotionNode::setOffset(float x, float y, float z)
+void JointNode::setOffset(float x, float y, float z)
 {
 	offset[0] = x;
 	offset[1] = y;
 	offset[2] = z;
 }
-void MotionNode::setNext(MotionNode *nextNode)
+void JointNode::setNext(JointNode *nextNode)
 {
 	next = nextNode;
 }
-void MotionNode::setChannelNum(int mchannelNum)
+void JointNode::setChannelNum(int mchannelNum)
 {
 	channelNum = mchannelNum;
 }
-bool MotionNode::checkEnd()
+bool JointNode::checkEnd()
 {
 	return isEnd;
 }
-string MotionNode::getName()
+string JointNode::getName()
 {
 	return name;
 }
-string MotionNode::getAxisOrder()
+string JointNode::getAxisOrder()
 {
 	return axisOrder;
 }
-void MotionNode::getOffset(float* outOffset)
+void JointNode::getOffset(float* outOffset)
 {
 	for(int i=0;i<3;i++)
 	{
 		outOffset[i] = offset[i];
 	}
 }
-float MotionNode::getOffset(int index)
+float JointNode::getOffset(int index)
 {
 	return offset[index];
 }
-int MotionNode::getChannelNum()
+int JointNode::getChannelNum()
 {
 	return channelNum;
 }
-MotionNode* MotionNode::getNextNode()
+JointNode* JointNode::getNextNode()
 {
 	return next;
 }
-void MotionNode::initData(int frames)
+void JointNode::initData(int frames)
 {
 	data = new float*[frames];
 	for(int i = 0; i < frames; i++)
@@ -140,8 +140,9 @@ BVHparser::BVHparser(const char* path)
 	}
 	getline(in, line);										//ROOT Hips
 	lineNum++;
-	rootNode = new MotionNode();
+	rootNode = new JointNode();
 	rootNode->setRoot();
+	allNodes.push_back(rootNode);
 	istringstream s(line);
 	string bvh_keyword;
 	string bvh_nodeName;
@@ -178,8 +179,8 @@ BVHparser::BVHparser(const char* path)
 	}
 	rootNode->setAxisOrder(newAxisOrder);
 	rootNode->setChannelNum(channelNum);
-	MotionNode* prevNode = rootNode;
-	MotionNode* prevNode4NextNode = rootNode;
+	JointNode* prevNode = rootNode;
+	JointNode* prevNode4NextNode = rootNode;
 	getline(in, line);
 	while(line.compare(0, 6, "MOTION") != 0)						
 	{
@@ -189,7 +190,7 @@ BVHparser::BVHparser(const char* path)
 		s >> bvh_keyword; s >> bvh_nodeName;
 		if(bvh_keyword=="JOINT")							//	JOINT LeftUpLeg
 		{
-			MotionNode *newNode = new MotionNode();
+			JointNode *newNode = new JointNode();
 			newNode->setName(bvh_nodeName);
 
 			//cout << bvh_nodeName <<endl;	//print to check
@@ -222,10 +223,11 @@ BVHparser::BVHparser(const char* path)
 			prevNode4NextNode->setNext(newNode);
 			prevNode = newNode;
 			prevNode4NextNode = newNode;
+			allNodes.push_back(newNode);
 		}
 		else if(bvh_keyword =="End")						//	End Site
 		{
-			MotionNode *newNode = new MotionNode();
+			JointNode *newNode = new JointNode();
 			newNode->setName(prevNode->getName()+bvh_nodeName);
 			newNode->setEnd();
 			getline(in, line);								//	{
@@ -236,6 +238,7 @@ BVHparser::BVHparser(const char* path)
 			newNode->setOffset(offx, offy, offz);
 
 			newNode->setParent(prevNode);
+			allNodes.push_back(newNode);
 			getline(in, line);								//	}
 		}
 		else if(bvh_keyword =="}")
@@ -250,7 +253,7 @@ BVHparser::BVHparser(const char* path)
 		getline(in, line);
 	}
 
-// 	Start MotionNode										//MOTION
+// 	Start JointNode										//MOTION
 	string str1, str2;	//to get the string for format
 	float fvalue;
 	getline(in, line);										//Frames: 4692
@@ -268,7 +271,7 @@ BVHparser::BVHparser(const char* path)
 	// cout << "frames : " << frames <<", frame time : " << frameTime << endl;
 
 	float f[6];
-	MotionNode *curNode;
+	JointNode *curNode;
 	curNode = rootNode;
 	while(curNode != nullptr)
 	{
@@ -383,10 +386,16 @@ BVHparser::BVHparser(const char* path)
 	}
 }
 
-MotionNode* BVHparser::getRootNode()
+JointNode* BVHparser::getRootNode()
 {
 	return rootNode;
 }
+
+JointNode* BVHparser::getNode(int nodeNum)
+{
+	return allNodes[nodeNum];
+}
+
 
 const char* BVHparser::getPath()
 {

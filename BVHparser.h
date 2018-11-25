@@ -64,6 +64,7 @@ public :
 	void useUpperBodyOnly();
 	bool isLowerBodyOnly();
 	bool isUpperBodyOnly();
+    int get_all_nodes_size(){return allNodes.size();}
 };
 #endif
 

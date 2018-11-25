@@ -142,8 +142,12 @@ BVHparser::BVHparser(const char* path)
 	lineNum++;
 	rootNode = new JointNode();
 	rootNode->setRoot();
-	allNodes.push_back(rootNode);
-	istringstream s(line);
+	
+    allNodes= vector<JointNode*>();
+    //cout<<"before puting rootNode/ allNodes size: "<<allNodes.size()<<endl;
+    allNodes.push_back(rootNode);
+    
+    istringstream s(line);
 	string bvh_keyword;
 	string bvh_nodeName;
 	s >> bvh_keyword; s >> bvh_nodeName;
@@ -192,7 +196,8 @@ BVHparser::BVHparser(const char* path)
 		{
 			JointNode *newNode = new JointNode();
 			newNode->setName(bvh_nodeName);
-
+            allNodes.push_back(newNode);
+            //cout<<"allNodes:"<<allNodes.size()<<endl;
 			//cout << bvh_nodeName <<endl;	//print to check
 
 			getline(in, line);								//	{
@@ -222,13 +227,14 @@ BVHparser::BVHparser(const char* path)
 			newNode->setAxisOrder(newAxisOrder);
 			prevNode4NextNode->setNext(newNode);
 			prevNode = newNode;
-			prevNode4NextNode = newNode;
-			allNodes.push_back(newNode);
-		}
+			prevNode4NextNode = newNode;	
+        }
 		else if(bvh_keyword =="End")						//	End Site
 		{
 			JointNode *newNode = new JointNode();
-			newNode->setName(prevNode->getName()+bvh_nodeName);
+			allNodes.push_back(newNode);
+            //cout<<"allNodes:"<<allNodes.size()<<endl;
+            newNode->setName(prevNode->getName()+bvh_nodeName);
 			newNode->setEnd();
 			getline(in, line);								//	{
 			getline(in, line);								//		OFFSET 3.64953 0.00000 0.00000
@@ -238,7 +244,7 @@ BVHparser::BVHparser(const char* path)
 			newNode->setOffset(offx, offy, offz);
 
 			newNode->setParent(prevNode);
-			allNodes.push_back(newNode);
+
 			getline(in, line);								//	}
 		}
 		else if(bvh_keyword =="}")
@@ -253,6 +259,7 @@ BVHparser::BVHparser(const char* path)
 		getline(in, line);
 	}
 
+       // cout<<"after parsing basic structure | allNodes: "<<allNodes.size()<<endl;
 // 	Start JointNode										//MOTION
 	string str1, str2;	//to get the string for format
 	float fvalue;
@@ -384,6 +391,8 @@ BVHparser::BVHparser(const char* path)
 		}
 		curNode = curNode->getNextNode();
 	}
+
+    cout<<"after parsing all | "<<path<<" | allNodes size= "<<allNodes.size()<<endl;
 }
 
 JointNode* BVHparser::getRootNode()
@@ -393,7 +402,7 @@ JointNode* BVHparser::getRootNode()
 
 JointNode* BVHparser::getNode(int nodeNum)
 {
-	return allNodes[nodeNum];
+    return allNodes[nodeNum];
 }
 
 

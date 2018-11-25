@@ -42,6 +42,7 @@ class MotionSegment{
         VectorXd get_Skeleton_end_positions();
 
     void set_Skeleton_positions(int frameTime, Skeleton * skel);
+    int get_all_nodes_size(){return bvhParser->get_all_nodes_size(); }
 };
 #endif
 
@@ -56,6 +57,11 @@ public:
     //get functions
 	BVHparser* getBVHparser(const char* action);
 	MotionSegment* getMotionSegment(const char* action);
+    
+    int get_bvh_parser_list_size(){return bvhParser_list.size();}
+    int get_motion_segment_list_size(){return motionSegment_list.size();}
+
+
     void getStartEndFrame(const char* action, int* start, int* end, int* start_motion_state, int* end_motion_state);
 
     //add functions
@@ -63,8 +69,8 @@ public:
     void newMotionSegment(BVHparser* bvhparser, const char* motion_name, int start, int end, int start_state, int end_state);
 
     //member variables
-    std::vector<BVHparser*> bvhParser_list;
-    std::vector<MotionSegment*> motionSegment_list;
+    std::vector<BVHparser> bvhParser_list;
+    std::vector<MotionSegment> motionSegment_list;
 };
 
 #endif

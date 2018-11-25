@@ -5,7 +5,7 @@
 #define MOTION_STATE_LEFT_FOOT 11
 #define MOTION_STATE_RIGHT_FOOT 12
 
-MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): bvhParser(bvhParser), motion_name(_motion_name), start(_start), end(_end), start_state(start_state), end_state(_end_state){}
+MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): bvhParser(_bvhParser), motion_name(_motion_name), start(_start), end(_end), start_state(_start_state), end_state(_end_state){}
 
 //get functions
 Vector3d MotionSegment::get_current_position(int nodeNum, int frameTime){
@@ -37,7 +37,7 @@ Vector3d MotionSegment::get_end_rotation(int nodeNum){
 }
 
 Vector3d MotionSegment::get_current_position_displacement(int nodeNum, int frameTime){
-	return get_current_position(nodeNum, frameTime)- get_current_position(start, frameTime);
+	return get_current_position(nodeNum, frameTime)- get_current_position(nodeNum, start);
 }
 
 
@@ -118,6 +118,7 @@ BVHmanager::BVHmanager()
     newMotionSegment(bvhParser, "walk_stop_right", 84, 897, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_STOP);
     newMotionSegment(bvhParser, "stop", 641, 641, MOTION_STATE_STOP, MOTION_STATE_STOP);
     newMotionSegment(bvhParser, "walk_left_to_right", 119, 139, MOTION_STATE_LEFT_FOOT, MOTION_STATE_RIGHT_FOOT);
+    newMotionSegment(bvhParser, "walk_right_to_left", 100, 119, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_LEFT_FOOT);
 
     bvhParser = newBVHparser("../MotionData2/mrl/walk_slow_stright.bvh");
 	newMotionSegment(bvhParser, "walk_slow", 170, 221, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
@@ -139,25 +140,34 @@ BVHmanager::BVHmanager()
 
     bvhParser = newBVHparser("../MotionData2/mrl/walk_normal_right_135.bvh");
 	newMotionSegment(bvhParser, "right_135", 96, 156, MOTION_STATE_LEFT_FOOT, MOTION_STATE_RIGHT_FOOT);
+    cout<<"BVHmanager constructor end"<<endl;
+    cout<<"bvhParser_list: "<<bvhParser_list.size()<<endl;
+
+    cout<<"motionSegment_list: "<<motionSegment_list.size()<<endl;
+
 
 }
 
 BVHparser* BVHmanager::newBVHparser(const char* action){
     BVHparser* bvhParser= new BVHparser(action);
-    bvhParser_list.push_back(bvhParser);
+    bvhParser_list.push_back(*bvhParser);
     return bvhParser;
 }
 
 void BVHmanager::newMotionSegment(BVHparser* bvhparser, const char* motion_name, int start, int end, int start_state, int end_state){
-    MotionSegment* motionSegment= new MotionSegment(bvhparser, motion_name, start, end, start_state, end_state);
-    motionSegment_list.push_back(motionSegment);
+    cout<<"newMotionSegment/ motion_name: "<<motion_name<<endl;
+     cout<<"bvhparser: "<<bvhparser->getPath()<<endl;
+   MotionSegment* motionSegment= new MotionSegment(bvhparser, motion_name, start, end, start_state, end_state);
+    motionSegment_list.push_back(*motionSegment);
+    cout<<"motionSegment, all nodes;"<<motionSegment->get_all_nodes_size()<<endl;
+    cout<<motion_name<<" constructed using "<<bvhparser->getPath()<<" , allNodes:"<<bvhparser->get_all_nodes_size()<<endl;
 }
 
 MotionSegment* BVHmanager::getMotionSegment(const char*action){
 	for(int i=0;i<motionSegment_list.size();i++)
 	{
-		if(strcmp(motionSegment_list[i]->get_motion_name(),action)==0)
-			return motionSegment_list[i];
+		if(strcmp(motionSegment_list[i].get_motion_name(),action)==0)
+            return &motionSegment_list[i];
 	}
 	cout<<"getMotionSegment : no such action "<<action<<endl;
 	return NULL;
@@ -205,8 +215,8 @@ getBVHparser(const char* action)
 {
 	for(int i=0;i<bvhParser_list.size();i++)
 	{
-		if(strcmp(bvhParser_list[i]->getPath(), bvhNameConverter(action))==0)
-			return bvhParser_list[i];
+		if(strcmp(bvhParser_list[i].getPath(), bvhNameConverter(action))==0)
+			return &bvhParser_list[i];
 	}
 	cout<<"getBVHparser : no such action "<<action<<endl;
 	return NULL;

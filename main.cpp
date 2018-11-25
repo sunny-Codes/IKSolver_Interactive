@@ -382,20 +382,23 @@ SetActionFromStack()
 		cout<<"why else ? prev/cur action is "<<prevMotionSegment->get_motion_name()<<" / "<<curMotionSegment->get_motion_name()<<endl;
 	}
 
-	prev_action_end_frame_position = worldSkel->getPositions();
 
 	mFrame = curMotionSegment->get_start(); //start_frame;
 	MOTION_STATE = curMotionSegment->get_end_state(); //end_motion_state;
 
-	// set interMotion_root_translation/rotation_displacement
+    // set interMotion_root_translation/rotation_displacement : DO IT HERE, cause no need to compute this all the time
+    prev_action_end_frame_position = worldSkel->getPositions();
+
+    /*
     Vector3d root_start_pos= curMotionSegment->get_start_position(0) *scale;
     Vector3d root_current_pos= worldSkel->getPositions().segment(0,3); // == prevMotionSegment->get_end_position(0)*scale;
     interMotion_root_translation_displacement=root_current_pos - root_start_pos;
     interMotion_root_translation_displacement.y() = 0.0;
+     */
 
-    Quaterniond root_start_rot= AngleAxisToQuaternion(curMotionSegment->get_start_rotation(0));
-    Quaterniond root_current_rot= AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3));
-    Quaterniond root_rotation_displacement_quat = root_current_rot* root_start_rot.inverse();
+    Quaterniond root_cur_start_rot= AngleAxisToQuaternion(curMotionSegment->get_start_rotation(0));
+    Quaterniond root_prev_end_rot= AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3));
+    Quaterniond root_rotation_displacement_quat = root_prev_end_rot* root_cur_start_rot.inverse();
 
     interMotion_root_rotation_displacement= QuaternionToAngleAxis(root_rotation_displacement_quat);
     interMotion_root_rotation_displacement.x() = 0;
@@ -410,33 +413,33 @@ void Timer(int value)
 		SetActionFromStack();
 	}
 
-	// root align
-    Vector3d root_start_frame_position = scale* curMotionSegment->get_start_position(0);
-    Vector3d root_cur_frame_position = scale* curMotionSegment->get_current_position(0, mFrame);
-    Vector3d intraMotion_root_position_displacement= root_cur_frame_position- root_start_frame_position;
+
+	// set the positions according to the current Motion Segment
+	curMotionSegment->set_Skeleton_positions(mFrame, worldSkel);
+
+    // align the root
+    //Vector3d root_start_frame_position = scale* curMotionSegment->get_start_position(0);
+    //Vector3d root_cur_frame_position = scale* curMotionSegment->get_current_position(0, mFrame);
+	//root_cur_frame_position- root_start_frame_position;
+
+	Vector3d intraMotion_root_position_displacement= scale* curMotionSegment->get_current_position_displacement(0, mFrame);
 
     Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
 
-    Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
+    //Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
     //Matrix3d newWorldTranslation= root_start_frame_position+ interMotion_root_translation_displacement + intraMotion_root_rotation_displacement_M* intraMotion_root_position_displacement;
-    Matrix3d newWorldTranslation= prevMotion_start_position + interMotion_root_rotation_displacement_M* intraMotion_root_position_displacement;
-    Quaterniond newWorldRotation_quat=AngleAxisToQuaternion(root_cur_rotation) * AngleAxisToQuaternion(interMotion_root_rotation_displacement);
+    Vector3d prevMotion_end_position= prevMotionSegment->get_end_position(0);
+    Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
+    Vector3d newWorldTranslation= prevMotion_end_position + interMotion_root_rotation_displacement_M * intraMotion_root_position_displacement;
+    Quaterniond newWorldRotation_quat= AngleAxisToQuaternion(interMotion_root_rotation_displacement)*AngleAxisToQuaternion(root_cur_rotation);
 
-    Vector3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
+    Matrix3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
     worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
     worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
 
-/*	VectorXd displaced_position = worldSkel->getPositions();
-
-	displaced_position.segment(3,3) += root_rotation_displacement;
-
-	displaced_position.segment(0,3) += root_translation_displacement;
-
-	worldSkel->setPositions(displaced_position);
-*/
 	TranslateViewCenter_Eye(worldSkel->getPositions().segment(0,3));
 
-
+	/*
 	curNode= curNode->getNextNode();
 	while(curNode!=nullptr)
 	{
@@ -449,21 +452,24 @@ void Timer(int value)
 		worldSkel->getBodyNode(curNode->getName())->setRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
 		curNode = curNode->getNextNode();
 	}
+    */
 
+	// Motion Warping
 
-	if(mFrame - cur_action_start_frame <= 10)
+	if(mFrame - curMotionSegment->get_start() <= 10)
 	{
 		if(!first_call)
 		{
-			double ratio = (mFrame - cur_action_start_frame)/10.0;
+			double ratio = (mFrame - curMotionSegment->get_start() )/10.0;
 			VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_position * (1-ratio);
+			//VectorXd warped_position = worldSkel->getPositions() * ratio + prevMotionSegment->get_Skeleton_end_positions() * (1-ratio);
 			warped_position.segment(0,3) = worldSkel->getPositions().segment(0,3);
 	
 			worldSkel->setPositions(warped_position);
 		}
 		else
 		{
-			if(mFrame - cur_action_start_frame == 10)
+			if(mFrame - curMotionSegment->get_start()  == 10)
 				first_call = false;
 		}
 		
@@ -936,12 +942,12 @@ void initMotionState()
 	prevMotionSegment= bvhmanager->getMotionSegment("stop");
 	curMotionSegment= bvhmanager->getMotionSegment("stop");
 
-	root_translation_displacement = - curMotionSegment->get_start_position(0);
-	root_translation_displacement.y()=0;
+	//root_translation_displacement = - curMotionSegment->get_start_position(0);
+	//root_translation_displacement.y()=0;
 
-	root_rotation_displacement= -curMotionSegment->get_start_rotation(0);
-	root_rotation_displacement.x()=0;
-	root_rotation_displacement.z()=0;
+	interMotion_root_rotation_displacement= -curMotionSegment->get_start_rotation(0);
+    interMotion_root_rotation_displacement.x()=0;
+    interMotion_root_rotation_displacement.z()=0;
 
 	 //we have to execute SetActionFromStack
 	mFrame  = curMotionSegment->get_start()+1; //642;

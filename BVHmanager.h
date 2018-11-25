@@ -1,4 +1,5 @@
 #include "BVHparser.h"
+#include "Skeleton.h"
 #include <Eigen/Dense>
 using namespace Eigen;
 
@@ -27,6 +28,8 @@ class MotionSegment{
         Vector3d get_end_position(int nodeNum);
         Vector3d get_end_rotation(int nodeNum);
 
+        Vector3d get_current_position_displacement(int nodeNum, int frameTime);
+
         int get_start();
         int get_end();
         int get_start_state();
@@ -34,8 +37,12 @@ class MotionSegment{
 
         const char* get_motion_name();
 
+        //calculate
+        VectorXd get_Skeleton_positions(int frameTime);
+        VectorXd get_Skeleton_end_positions();
 
-}
+    void set_Skeleton_positions(int frameTime, Skeleton * skel);
+};
 #endif
 
 #ifndef BVHmanager_H
@@ -52,7 +59,7 @@ public:
     void getStartEndFrame(const char* action, int* start, int* end, int* start_motion_state, int* end_motion_state);
 
     //add functions
-    void newBVHparser(const char* action);
+    BVHparser* newBVHparser(const char* action);
     void newMotionSegment(BVHparser* bvhparser, const char* motion_name, int start, int end, int start_state, int end_state);
 
     //member variables

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string>
 #include <Eigen/Dense>
+#include "BasicMath.h"
 typedef struct Box_ 
 {
 	float width;
@@ -25,7 +26,9 @@ public:
 	void setTransform(Eigen::Isometry3d transform_)	{transform = transform_;}
 	void setWorldTranslation(Eigen::Vector3d translation);
 	void setWorldRotation(Eigen::Matrix3d rotation);
+	void setWorldRotation_v(Eigen::Vector3d rotation);
 	void setRotation(Eigen::Matrix3d rotation);
+	void setRotation_v(Eigen::Vector3d rotation);
 	void Translate(Eigen::Vector3d translation);
 	Eigen::Isometry3d getTransform();
 	Eigen::Isometry3d getWorldTransform()			{return worldTransform;}

@@ -5,7 +5,7 @@
 #define MOTION_STATE_LEFT_FOOT 11
 #define MOTION_STATE_RIGHT_FOOT 12
 
-MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): bvhParser(bvhParser), motion_name(_motion_name, start(_start), end(_end), start_state(start_state), end_state(_end_state){}
+MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): bvhParser(bvhParser), motion_name(_motion_name), start(_start), end(_end), start_state(start_state), end_state(_end_state){}
 
 //get functions
 Vector3d MotionSegment::get_current_position(int nodeNum, int frameTime){
@@ -36,12 +36,76 @@ Vector3d MotionSegment::get_end_rotation(int nodeNum){
     return get_current_rotation(nodeNum, end);
 }
 
+Vector3d MotionSegment::get_current_position_displacement(int nodeNum, int frameTime){
+	return get_current_position(nodeNum, frameTime)- get_current_position(start, frameTime);
+}
+
+
 int MotionSegment::get_start(){return start;}
 int MotionSegment::get_end(){return end;}
 int MotionSegment::get_start_state(){return start_state;}
 int MotionSegment::get_end_state(){return end_state;}
+const char*  MotionSegment::get_motion_name(){return motion_name;}
 
- 
+VectorXd MotionSegment::get_Skeleton_positions(int frameTime){
+	VectorXd positions;
+
+	JointNode* curNode= bvhParser->getRootNode();
+	int i=0;
+
+	Vector3d root_position = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+    positions.segment(i,3)= root_position;
+    i+= 3;
+	Vector3d root_rotation = Vector3d(curNode->data[frameTime][3], curNode->data[frameTime][4], curNode->data[frameTime][5]);
+	positions.segment(i,3)= root_rotation;
+	i+= 3;
+
+	curNode= curNode->getNextNode();
+	while(curNode!=nullptr)
+	{
+		if(curNode->checkEnd())
+		{
+			curNode = curNode->getNextNode();
+			continue;
+		}
+		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+		positions.segment(i,3)= rotation; // angle-axis
+		curNode = curNode->getNextNode();
+        i+= 3;
+    }
+	return positions;
+}
+
+VectorXd MotionSegment::get_Skeleton_end_positions(){
+	return get_Skeleton_positions(end);
+}
+void MotionSegment::set_Skeleton_positions(int frameTime, Skeleton * skel){
+	JointNode* curNode= bvhParser->getRootNode();
+	int i=0;
+
+	Vector3d root_position = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+	skel->getRootBodyNode()->setWorldTranslation(root_position);
+
+	Vector3d root_rotation = Vector3d(curNode->data[frameTime][3], curNode->data[frameTime][4], curNode->data[frameTime][5]);
+    skel->getRootBodyNode()->setWorldRotation_v(root_rotation);
+
+    curNode= curNode->getNextNode();
+
+	while(curNode!=nullptr)
+	{
+		if(curNode->checkEnd())
+		{
+			curNode = curNode->getNextNode();
+			continue;
+		}
+		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+		skel->getBodyNode(curNode->getName())->setRotation_v(rotation);
+		curNode = curNode->getNextNode();
+	}
+
+}
+
+
 BVHmanager::BVHmanager()
 {
 	BVHparser* bvhParser = newBVHparser("../MotionData2/mrl/walk_fast_stright.bvh");
@@ -78,21 +142,21 @@ BVHmanager::BVHmanager()
 
 }
 
-BVHparser* BVHmanger::newBVHparser(const char* action){
+BVHparser* BVHmanager::newBVHparser(const char* action){
     BVHparser* bvhParser= new BVHparser(action);
     bvhParser_list.push_back(bvhParser);
     return bvhParser;
 }
 
 void BVHmanager::newMotionSegment(BVHparser* bvhparser, const char* motion_name, int start, int end, int start_state, int end_state){
-    MotionSegment* motionSegement= new MotionSegment(bvhparser, motion_name, start, end, start_state, end_state);
+    MotionSegment* motionSegment= new MotionSegment(bvhparser, motion_name, start, end, start_state, end_state);
     motionSegment_list.push_back(motionSegment);
 }
 
 MotionSegment* BVHmanager::getMotionSegment(const char*action){
 	for(int i=0;i<motionSegment_list.size();i++)
 	{
-		if(strcmp(motionSegment_list[i]->getPath(),action)==0)
+		if(strcmp(motionSegment_list[i]->get_motion_name(),action)==0)
 			return motionSegment_list[i];
 	}
 	cout<<"getMotionSegment : no such action "<<action<<endl;

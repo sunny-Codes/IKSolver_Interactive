@@ -2,6 +2,7 @@
 #define SKELETON_H
 
 #include "BodyNode.h"
+#include "BasicMath.h"
 #include <vector>
 
 class Skeleton

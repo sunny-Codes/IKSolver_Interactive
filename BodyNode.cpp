@@ -74,6 +74,12 @@ void BodyNode::setWorldRotation(Eigen::Matrix3d rotation)	//only for root
 	worldTransform.linear() = rotation;
 }
 
+void BodyNode::setWorldRotation_v(Eigen::Vector3d rotation)	//only for root
+{
+    worldTransform.linear() = AngleAxisToQuaternion(rotation).toRotationMatrix();
+}
+
+
 void BodyNode::setRotation(Eigen::Matrix3d rotation)
 {
 	if(haveParent())
@@ -84,5 +90,8 @@ void BodyNode::setRotation(Eigen::Matrix3d rotation)
 	}
 	else
 		setWorldRotation(rotation);
+}
 
+void BodyNode::setRotation_v(Eigen::Vector3d rotation){
+	setRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
 }

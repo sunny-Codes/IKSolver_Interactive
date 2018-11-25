@@ -29,6 +29,8 @@ void Skeleton::setRootBodyNode(BodyNode* rootBodyNode)
 }
 
 /// convert quaternion -> log(quaternion)
+/// moved to "BasicMath.cpp"
+/*
 Eigen::Vector3d QuaternionToAngleAxis(Eigen::Quaterniond qt)
 {
 	double angle = atan2(qt.vec().norm(), qt.w());
@@ -43,6 +45,7 @@ Eigen::Quaterniond AngleAxisToQuaternion(Eigen::Vector3d angleAxis)
 	qt.w() = cos(angleAxis.norm());
 	return qt;
 }
+*/
 
 Eigen::MatrixXd Skeleton::getJacobian(BodyNode* bodyNode, Eigen::Vector3d offset)
 {

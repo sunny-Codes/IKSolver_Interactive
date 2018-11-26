@@ -3,52 +3,80 @@
 #include <Eigen/Dense>
 using namespace Eigen;
 
+#ifndef MotionFrame_H
+#define MotionFrame_H
+class MotionFrame{
+    public:
+        Vector3d root_position;
+    vector<Vector3d> rotations;
+    MotionFrame();
+    MotionFrame(Vector3d root_position, vector<Vector3d>rotations);
+    MotionFrame(VectorXd dofs);
+    void set_root_position(Vector3d root_position);
+    void add_rotation(Vector3d rotation);
+    VectorXd to_VectorXd();
+};
+#endif
+
 #ifndef MotionSegment_H
 #define MotionSegment_H
+
 class MotionSegment{
     private:
         const char * motion_name;
         //BVHparser* bvhParser;
-        vector<JointNode*> allJoints;
-
+        //vector<JointNode*> allJoints;
+        vector<MotionFrame> motionFrames;
+        vector<string> rotation_dof_order;
+        /*
         int start;
         int end;
+        */
         int start_state;
         int end_state;
         vector<int> knots;
+
     public:
         //constuctor
         MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int start, int end, int start_state, int end_state);
 
+        MotionSegment(vector<VectorXd> dofs, vector<string> _dof_joint_order);
+
         //get functions
-        Vector3d get_current_position(int jointNum, int frameTime);
+        Vector3d get_current_root_position(int frameTime);
+        Vector3d get_start_root_position();
+        Vector3d get_end_root_position();
+
         Vector3d get_current_rotation(int jointNum, int frameTime);
-    
-        Vector3d get_start_position(int jointNum);
         Vector3d get_start_rotation(int jointNum);
- 
-        Vector3d get_end_position(int jointNum);
         Vector3d get_end_rotation(int jointNum);
 
-        Vector3d get_current_position_displacement(int jointNum, int frameTime);
+        Vector3d get_current_root_position_displacement(int frameTime);
 
+        /*
         int get_start();
         int get_end();
+        */
         int get_start_state();
         int get_end_state();
+        
         const char* get_motion_name();
         int get_knots_size(){return knots.size(); }
-        int get_frame_length(){return end-start;}
+        int get_frame_length(){return motionFrames.size();}
 
         //calculate
+ 
+        MotionFrame get_motionFrame(int frameTime);
         VectorXd get_Skeleton_dofs(int frameTime);
         VectorXd get_Skeleton_end_dofs();
 
-    void set_Skeleton_dofs(int frameTime, float scale, Skeleton * skel);
-    void set_Skeleton_dofs_except_root(int frameTime, float scale, Skeleton * skel);
+        void set_Skeleton_bodyNode(int frameTime, float scale, Skeleton * skel);
+        void set_Skeleton_bodyNode_except_root(int frameTime, float scale, Skeleton * skel);
     
-    int get_allJoints_size(){return allJoints.size(); }
+    //int get_allJoints_size(){return allJoints.size(); }
     MotionSegment* blend(MotionSegment* anotherMS, float t);
+    MotionSegment* dynamicTimeWarping(MotionSegment* anotherMS, float t);
+ 
 };
 #endif
 

@@ -352,8 +352,6 @@ SetActionFromStack()
 
     if(MOTION_STATE == StackMotion->get_start_state())
 	{
-		cout<<curMotionSegment->get_motion_name()<<endl;
-
 		prevMotionSegment= curMotionSegment;
 		curMotionSegment= StackMotion;
 
@@ -385,8 +383,10 @@ SetActionFromStack()
 		cout<<"why else ? prev/cur action is "<<prevMotionSegment->get_motion_name()<<" / "<<curMotionSegment->get_motion_name()<<endl;
 	}
 
+	cout<<prevMotionSegment->get_motion_name() <<" -> "<<curMotionSegment->get_motion_name()<<endl;
 
-	mFrame = curMotionSegment->get_start(); //start_frame;
+
+	mFrame = 0; //curMotionSegment->get_start(); //start_frame;
 	MOTION_STATE = curMotionSegment->get_end_state(); //end_motion_state;
 
     // set interMotion_root_translation/rotation_displacement : DO IT HERE, cause no need to compute this all the time
@@ -394,7 +394,7 @@ SetActionFromStack()
     
     prev_action_end_position= prev_action_end_frame_Skeleton_dofs.segment(0,3); 
     
-    Vector3d root_start_pos= curMotionSegment->get_start_position(0) *scale;
+    Vector3d root_start_pos= curMotionSegment->get_start_root_position()*scale;
     
     Vector3d root_current_pos= worldSkel->getDofs().segment(0,3); 
     //interMotion_root_translation_displacement=root_current_pos - root_start_pos;
@@ -414,13 +414,14 @@ SetActionFromStack()
 /// called every frameTime sec.
 void Timer(int value)
 {
-    if(curMotionSegment->get_end() < mFrame)
+    if(curMotionSegment->get_frame_length() <= mFrame)
 	{
+        cout<<"mFrame: "<<mFrame<<endl;
         SetActionFromStack();
 	}
      
     // align the root
-	Vector3d intraMotion_root_position_displacement= scale* curMotionSegment->get_current_position_displacement(0, mFrame);
+	Vector3d intraMotion_root_position_displacement= scale* curMotionSegment->get_current_root_position_displacement(mFrame);
     Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
     Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
 
@@ -429,20 +430,22 @@ void Timer(int value)
     
     Matrix3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
     
+    //set Skeleton Root BodyNode
     worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
     worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
  
-    // set Skeleton dofs (joints except root)
-    curMotionSegment->set_Skeleton_dofs_except_root(mFrame, scale, worldSkel);
+    // set Skeleton BodyNode (joints except root)
+    curMotionSegment->set_Skeleton_bodyNode_except_root(mFrame, scale, worldSkel);
        
     TranslateViewCenter_Eye(worldSkel->getDofs().segment(0,3));
 
     // Motion Warping (for 10 frames)
-	if(mFrame - curMotionSegment->get_start() <= 10)
+	
+    if(mFrame <= 10)
 	{
 		if(!first_call)
 		{
-			double ratio = (mFrame - curMotionSegment->get_start() )/10.0;
+			double ratio = mFrame/10.0;
 			VectorXd warped_position = worldSkel->getDofs() * ratio + prev_action_end_frame_Skeleton_dofs * (1-ratio);
 			//VectorXd warped_position = worldSkel->getDofs() * ratio + prevMotionSegment->get_Skeleton_end_dofs() * (1-ratio);
 			warped_position.segment(0,3) = worldSkel->getDofs().segment(0,3);
@@ -451,7 +454,7 @@ void Timer(int value)
 		}
 		else
 		{
-			if(mFrame - curMotionSegment->get_start()  == 10)
+			if(mFrame  == 10)
 				first_call = false;
 		}
 		
@@ -931,8 +934,8 @@ void initMotionState()
 	prevMotionSegment= bvhmanager->getMotionSegment("stop");
 	curMotionSegment= bvhmanager->getMotionSegment("stop");
     
-    mFrame= curMotionSegment->get_start();
-    curMotionSegment->set_Skeleton_dofs(mFrame, scale, worldSkel); 
+    mFrame= 0; //curMotionSegment->get_start();
+    curMotionSegment->set_Skeleton_bodyNode(mFrame, scale, worldSkel); 
  
     //root_translation_displacement = - curMotionSegment->get_start_position(0);
 	//root_translation_displacement.y()=0;
@@ -943,7 +946,7 @@ void initMotionState()
     interMotion_root_rotation_displacement.z()=0;
 
 	 //we have to execute SetActionFromStack
-	mFrame  = curMotionSegment->get_start()+1; //642;
+	mFrame++;  
 
    //worldSkel->setDofs(prevMotionSegment->get_Skeleton_end_dofs());
     prev_action_end_frame_Skeleton_dofs = worldSkel->getDofs();

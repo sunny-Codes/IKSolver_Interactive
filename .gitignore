@@ -1,4 +1,5 @@
 cmake-build-debug/*
+.Eigen/*
 .idea/*
 build/*
 *.sublime*

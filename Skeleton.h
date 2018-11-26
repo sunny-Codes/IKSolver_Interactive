@@ -17,9 +17,9 @@ public:
 	void addBodyNode(BodyNode* newNode);
 	int getNumBodyNodes()							{return BodyNodes.size();}
 	int getNumDofs()							{return BodyNodes.size()*3+3;}
-	void setPositions(Eigen::VectorXd pos);
-	void setPosition(int index, double value);
-	Eigen::VectorXd getPositions();
+	void setDofs(Eigen::VectorXd pos);
+	void setDof(int index, double value);
+	Eigen::VectorXd getDofs();
 	Eigen::MatrixXd getJacobian(BodyNode* bodyNode, Eigen::Vector3d offset);
 
 private:

@@ -51,17 +51,17 @@ int MotionSegment::get_start_state(){return start_state;}
 int MotionSegment::get_end_state(){return end_state;}
 const char*  MotionSegment::get_motion_name(){return motion_name;}
 
-VectorXd MotionSegment::get_Skeleton_positions(int frameTime){
-	VectorXd positions;
+VectorXd MotionSegment::get_Skeleton_dofs(int frameTime){
+	VectorXd dofs;
 
 	JointNode* curNode= bvhParser->getRootNode();
 	int i=0;
 
 	Vector3d root_position = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
-    positions.segment(i,3)= root_position;
+    dofs.segment(i,3)= root_position;
     i+= 3;
 	Vector3d root_rotation = Vector3d(curNode->data[frameTime][3], curNode->data[frameTime][4], curNode->data[frameTime][5]);
-	positions.segment(i,3)= root_rotation;
+	dofs.segment(i,3)= root_rotation;
 	i+= 3;
 
 	curNode= curNode->getNextNode();
@@ -73,18 +73,18 @@ VectorXd MotionSegment::get_Skeleton_positions(int frameTime){
 			continue;
 		}
 		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
-		positions.segment(i,3)= rotation; // angle-axis
+		dofs.segment(i,3)= rotation; // angle-axis
 		curNode = curNode->getNextNode();
         i+= 3;
     }
-    cout<<"get_Skeleton_positions: "<<positions.transpose()<<endl;
-	return positions;
+    cout<<"get_Skeleton_dofs: "<<dofs.transpose()<<endl;
+	return dofs;
 }
 
-VectorXd MotionSegment::get_Skeleton_end_positions(){
-	return get_Skeleton_positions(end);
+VectorXd MotionSegment::get_Skeleton_end_dofs(){
+	return get_Skeleton_dofs(end);
 }
-void MotionSegment::set_Skeleton_positions(int frameTime, float scale, Skeleton * skel){
+void MotionSegment::set_Skeleton_dofs(int frameTime, float scale, Skeleton * skel){
 	JointNode* curNode= bvhParser->getRootNode();
 	int i=0;
 
@@ -110,7 +110,7 @@ void MotionSegment::set_Skeleton_positions(int frameTime, float scale, Skeleton 
 
 }
 
-void MotionSegment::set_Skeleton_positions_except_root(int frameTime, float scale, Skeleton * skel){
+void MotionSegment::set_Skeleton_dofs_except_root(int frameTime, float scale, Skeleton * skel){
 	JointNode* curNode= bvhParser->getRootNode();
 	int i=0;
 

@@ -33,7 +33,7 @@ Vector3d prev_viewCenter = viewCenter;
 Vector3d axis;
 Vector3d actual_cur_point, actual_prev_point;
 
-VectorXd prev_skel_positions;
+VectorXd prev_skel_dofs;
 Isometry3d prev_skel_transform;
 Skeleton* worldSkel;
 BVHmanager* bvhmanager;
@@ -70,7 +70,7 @@ int MOTION_STATE = MOTION_STATE_STOP;
 Vector3d interMotion_root_rotation_displacement;
 //Vector3d interMotion_root_translation_displacement;
 Vector3d prev_action_end_position;
-VectorXd prev_action_end_frame_Skeleton_positions;
+VectorXd prev_action_end_frame_Skeleton_dofs;
 
 
 bool first_call = true;
@@ -390,18 +390,18 @@ SetActionFromStack()
 	MOTION_STATE = curMotionSegment->get_end_state(); //end_motion_state;
 
     // set interMotion_root_translation/rotation_displacement : DO IT HERE, cause no need to compute this all the time
-    prev_action_end_frame_Skeleton_positions = worldSkel->getPositions(); //.segment(0,3);
+    prev_action_end_frame_Skeleton_dofs = worldSkel->getDofs(); //.segment(0,3);
     
-    prev_action_end_position= prev_action_end_frame_Skeleton_positions.segment(0,3); 
+    prev_action_end_position= prev_action_end_frame_Skeleton_dofs.segment(0,3); 
     
     Vector3d root_start_pos= curMotionSegment->get_start_position(0) *scale;
     
-    Vector3d root_current_pos= worldSkel->getPositions().segment(0,3); 
+    Vector3d root_current_pos= worldSkel->getDofs().segment(0,3); 
     //interMotion_root_translation_displacement=root_current_pos - root_start_pos;
     //interMotion_root_translation_displacement.y() = 0.0;
 
     Quaterniond root_cur_start_rot= AngleAxisToQuaternion(curMotionSegment->get_start_rotation(0));
-    Quaterniond root_prev_end_rot= AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3));
+    Quaterniond root_prev_end_rot= AngleAxisToQuaternion(worldSkel->getDofs().segment(3,3));
     Quaterniond root_rotation_displacement_quat = root_prev_end_rot* root_cur_start_rot.inverse();
 
     interMotion_root_rotation_displacement= QuaternionToAngleAxis(root_rotation_displacement_quat);
@@ -432,10 +432,10 @@ void Timer(int value)
     worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
     worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
  
-    // set Skeleton positions (joints except root)
-    curMotionSegment->set_Skeleton_positions_except_root(mFrame, scale, worldSkel);
+    // set Skeleton dofs (joints except root)
+    curMotionSegment->set_Skeleton_dofs_except_root(mFrame, scale, worldSkel);
        
-    TranslateViewCenter_Eye(worldSkel->getPositions().segment(0,3));
+    TranslateViewCenter_Eye(worldSkel->getDofs().segment(0,3));
 
     // Motion Warping (for 10 frames)
 	if(mFrame - curMotionSegment->get_start() <= 10)
@@ -443,11 +443,11 @@ void Timer(int value)
 		if(!first_call)
 		{
 			double ratio = (mFrame - curMotionSegment->get_start() )/10.0;
-			VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_Skeleton_positions * (1-ratio);
-			//VectorXd warped_position = worldSkel->getPositions() * ratio + prevMotionSegment->get_Skeleton_end_positions() * (1-ratio);
-			warped_position.segment(0,3) = worldSkel->getPositions().segment(0,3);
+			VectorXd warped_position = worldSkel->getDofs() * ratio + prev_action_end_frame_Skeleton_dofs * (1-ratio);
+			//VectorXd warped_position = worldSkel->getDofs() * ratio + prevMotionSegment->get_Skeleton_end_dofs() * (1-ratio);
+			warped_position.segment(0,3) = worldSkel->getDofs().segment(0,3);
 	
-			worldSkel->setPositions(warped_position);
+			worldSkel->setDofs(warped_position);
 		}
 		else
 		{
@@ -484,7 +484,7 @@ void processMouse(int button, int state, int x, int y)
 			// 	{
 			// 		cout<<worldSkel->getBodyNode(selectedObject)->getName()<<endl;
 			// 		prev_skel_transform = worldSkel->getBodyNode(selectedObject)->getTransform();
-			// 		prev_skel_positions= worldSkel->getPositions();
+			// 		prev_skel_dofs= worldSkel->getDofs();
 			// 		prev_obj_trackBall_transform = obj_trackBall_transform;
 			// 		mouseObjectRotate_ON = true;
 			// 	}
@@ -518,7 +518,7 @@ void processMouse(int button, int state, int x, int y)
 			// 		mouseObjectTranslate_ON = true;
 			// 		cout<<worldSkel->getBodyNode(selectedObject)->getName()<<endl;
 
-			// 		prev_skel_positions= worldSkel->getPositions();
+			// 		prev_skel_dofs= worldSkel->getDofs();
 			// 	}
 			// 	else{
 			// 		mouseObjectTranslate_ON = false;
@@ -666,10 +666,10 @@ double lineSearch(Skeleton* skel,
 	Vector3d prev_vec = targetPosition - skel->getBodyNode(sel_ob)->getWorldTransform()*offset;
 	prev_vec.normalize();
 	pos += gradient * stepSize;
-	skel->setPositions(pos);
+	skel->setDofs(pos);
 	Vector3d cur_vec = targetPosition - skel->getBodyNode(sel_ob)->getWorldTransform()*offset;
 	cur_vec.normalize();
-	skel->setPositions(prev_pos);
+	skel->setDofs(prev_pos);
 	if(prev_vec.dot(cur_vec) < cos(M_PI/2.0 * 0.2))
 	{
 		return lineSearch(skel, pos, gradient, stepSize/2.0, sel_ob, offset, targetPosition);
@@ -707,7 +707,7 @@ void solveJacobianIK_translation(int x, int y)
 	Vector3d real_diff_3d;
 	real_diff_3d = prev_viewCenter + real_diff[0] * viewLeft + real_diff[1] * (viewUp);
 
-	worldSkel->setPositions(prev_skel_positions);
+	worldSkel->setDofs(prev_skel_dofs);
 	Vector3d targetPosition = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation() + real_diff_3d;
 
 	int steps = 0;
@@ -717,13 +717,13 @@ void solveJacobianIK_translation(int x, int y)
 	while((targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation()).norm()>1E-4)
 	{
 		stepSize = 0.1;
-		VectorXd pos = worldSkel->getPositions();
+		VectorXd pos = worldSkel->getDofs();
 		MatrixXd jacobian = worldSkel->getJacobian(worldSkel->getBodyNode(selectedObject), Vector3d::Zero());
 		JacobiSVD<MatrixXd> svd(jacobian, ComputeThinU | ComputeThinV);
 		gradient =svd.solve(targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation());
 		stepSize = lineSearch(worldSkel, pos, gradient, stepSize, selectedObject, Vector3d::Zero(), targetPosition);
 		pos += gradient * stepSize;
-		worldSkel->setPositions(pos);
+		worldSkel->setDofs(pos);
 		steps++;
 	}
 }
@@ -795,10 +795,10 @@ void solveJacobianIK_rotation(int x, int y)
 	obj_trackBall_transform.linear()=
 		prev_obj_trackBall_transform.rotation() * AngleAxisd(angle, axis).toRotationMatrix();
 
-	VectorXd curPos = worldSkel->getPositions();
-	worldSkel->setPositions(prev_skel_positions);
+	VectorXd curPos = worldSkel->getDofs();
+	worldSkel->setDofs(prev_skel_dofs);
 	Vector3d targetPosition = worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation();
-	worldSkel->setPositions(curPos);
+	worldSkel->setDofs(curPos);
 
 	int steps = 0;
 	double stepSize = 0.1;
@@ -806,7 +806,7 @@ void solveJacobianIK_rotation(int x, int y)
 	while((targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation()).norm()>1E-4)
 	{
 		stepSize = 0.1;
-		VectorXd pos = worldSkel->getPositions();
+		VectorXd pos = worldSkel->getDofs();
 		MatrixXd jacobian = worldSkel->getJacobian(worldSkel->getBodyNode(selectedObject), Vector3d::Zero());
 		jacobian.block<3,3>(0, 3+3*selectedObject) = Matrix3d::Zero();
 
@@ -814,7 +814,7 @@ void solveJacobianIK_rotation(int x, int y)
 		gradient =svd.solve(targetPosition - worldSkel->getBodyNode(selectedObject)->getWorldTransform().translation());
 		stepSize = lineSearch(worldSkel, pos, gradient, stepSize, selectedObject, Vector3d::Zero(), targetPosition);
 		pos += gradient * stepSize;
-		worldSkel->setPositions(pos);
+		worldSkel->setDofs(pos);
 		steps++;
 	}
 }
@@ -932,7 +932,7 @@ void initMotionState()
 	curMotionSegment= bvhmanager->getMotionSegment("stop");
     
     mFrame= curMotionSegment->get_start();
-    curMotionSegment->set_Skeleton_positions(mFrame, scale, worldSkel); 
+    curMotionSegment->set_Skeleton_dofs(mFrame, scale, worldSkel); 
  
     //root_translation_displacement = - curMotionSegment->get_start_position(0);
 	//root_translation_displacement.y()=0;
@@ -945,9 +945,9 @@ void initMotionState()
 	 //we have to execute SetActionFromStack
 	mFrame  = curMotionSegment->get_start()+1; //642;
 
-   //worldSkel->setPositions(prevMotionSegment->get_Skeleton_end_positions());
-    prev_action_end_frame_Skeleton_positions = worldSkel->getPositions();
-    prev_action_end_position = scale* prev_action_end_frame_Skeleton_positions.segment(0,3);
+   //worldSkel->setDofs(prevMotionSegment->get_Skeleton_end_dofs());
+    prev_action_end_frame_Skeleton_dofs = worldSkel->getDofs();
+    prev_action_end_position = scale* prev_action_end_frame_Skeleton_dofs.segment(0,3);
     
     cout<<"initMotionState() done"<<endl;
 

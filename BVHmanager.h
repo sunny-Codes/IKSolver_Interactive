@@ -40,11 +40,11 @@ class MotionSegment{
         int get_frame_length(){return end-start;}
 
         //calculate
-        VectorXd get_Skeleton_positions(int frameTime);
-        VectorXd get_Skeleton_end_positions();
+        VectorXd get_Skeleton_dofs(int frameTime);
+        VectorXd get_Skeleton_end_dofs();
 
-    void set_Skeleton_positions(int frameTime, float scale, Skeleton * skel);
-    void set_Skeleton_positions_except_root(int frameTime, float scale, Skeleton * skel);
+    void set_Skeleton_dofs(int frameTime, float scale, Skeleton * skel);
+    void set_Skeleton_dofs_except_root(int frameTime, float scale, Skeleton * skel);
     
     int get_all_nodes_size(){return bvhParser->get_all_nodes_size(); }
     MotionSegment* blend(MotionSegment* anotherMS, float t);

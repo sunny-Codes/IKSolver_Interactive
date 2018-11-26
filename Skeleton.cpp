@@ -113,11 +113,11 @@ Eigen::MatrixXd Skeleton::getJacobian(BodyNode* bodyNode, Eigen::Vector3d offset
 	return jacobian;
 }
 
-// positions are consist of log(quaternion)
-void Skeleton::setPositions(Eigen::VectorXd pos)
+// dofs are consist of log(quaternion)
+void Skeleton::setDofs(Eigen::VectorXd pos)
 {
 	if(pos.size()!=getNumDofs())
-		cout<<"error in setPositions"<<endl;
+		cout<<"error in setDofs"<<endl;
 	BodyNodes[0]->setWorldTranslation(pos.segment(0,3));
 	BodyNodes[0]->setWorldRotation(AngleAxisToQuaternion(pos.segment(3,3)).toRotationMatrix());
 	int numBodies = getNumBodyNodes();
@@ -127,13 +127,13 @@ void Skeleton::setPositions(Eigen::VectorXd pos)
 	}
 }
 
-void Skeleton::setPosition(int index, double value)
+void Skeleton::setDof(int index, double value)
 {
-	Eigen::VectorXd pos = getPositions();
+	Eigen::VectorXd pos = getDofs();
 	pos[index] = value;
-	setPositions(pos);
+	setDofs(pos);
 }
-Eigen::VectorXd Skeleton::getPositions()
+Eigen::VectorXd Skeleton::getDofs()
 {
 	Eigen::VectorXd pos(getNumDofs());
 	pos.segment(0,3) = BodyNodes[0]->getWorldTransform().translation();

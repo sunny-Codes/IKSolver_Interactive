@@ -32,7 +32,7 @@ void BodyNode::updateWorldTransform()
 	if(haveParent())
 	{
 		worldTransform = parentNode->getWorldTransform()*joint.parentBodyToJoint * transform;
-	}
+    }
 }
 // We should decide 2 parameter for each joint 
 // to precisely deterimine the position of joint and the child joint 

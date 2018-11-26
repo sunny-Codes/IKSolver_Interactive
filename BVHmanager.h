@@ -9,11 +9,12 @@ class MotionSegment{
     private:
         const char * motion_name;
         BVHparser* bvhParser;
-
+        
         int start;
         int end;
         int start_state;
         int end_state;
+        vector<int> knots;
     public:
         //constuctor
         MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int start, int end, int start_state, int end_state);
@@ -34,15 +35,19 @@ class MotionSegment{
         int get_end();
         int get_start_state();
         int get_end_state();
-
         const char* get_motion_name();
+        int get_knots_size(){return knots.size(); }
+        int get_frame_length(){return end-start;}
 
         //calculate
         VectorXd get_Skeleton_positions(int frameTime);
         VectorXd get_Skeleton_end_positions();
 
-    void set_Skeleton_positions(int frameTime, Skeleton * skel);
+    void set_Skeleton_positions(int frameTime, float scale, Skeleton * skel);
+    void set_Skeleton_positions_except_root(int frameTime, float scale, Skeleton * skel);
+    
     int get_all_nodes_size(){return bvhParser->get_all_nodes_size(); }
+    MotionSegment* blend(MotionSegment* anotherMS, float t);
 };
 #endif
 

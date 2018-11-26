@@ -13,6 +13,8 @@
 using namespace std;
 using namespace Eigen;
 
+bool play_once_done= false;
+
 float fovy = 50.0f;
 float aspectRatio = 1260.0f / 760.0f;
 Vector3d eye(0.0f, 10.0f, -20.0f);
@@ -66,8 +68,10 @@ int prev_action_end_frame;
 int MOTION_STATE = MOTION_STATE_STOP;
 
 Vector3d interMotion_root_rotation_displacement;
-Vector3d interMotion_root_translation_displacement;
-VectorXd prev_action_end_frame_position;
+//Vector3d interMotion_root_translation_displacement;
+Vector3d prev_action_end_position;
+VectorXd prev_action_end_frame_Skeleton_positions;
+
 
 bool first_call = true;
 using namespace std;
@@ -386,14 +390,15 @@ SetActionFromStack()
 	MOTION_STATE = curMotionSegment->get_end_state(); //end_motion_state;
 
     // set interMotion_root_translation/rotation_displacement : DO IT HERE, cause no need to compute this all the time
-    prev_action_end_frame_position = worldSkel->getPositions();
-
-    /*
+    prev_action_end_frame_Skeleton_positions = worldSkel->getPositions(); //.segment(0,3);
+    
+    prev_action_end_position= prev_action_end_frame_Skeleton_positions.segment(0,3); 
+    
     Vector3d root_start_pos= curMotionSegment->get_start_position(0) *scale;
-    Vector3d root_current_pos= worldSkel->getPositions().segment(0,3); // == prevMotionSegment->get_end_position(0)*scale;
-    interMotion_root_translation_displacement=root_current_pos - root_start_pos;
-    interMotion_root_translation_displacement.y() = 0.0;
-     */
+    
+    Vector3d root_current_pos= worldSkel->getPositions().segment(0,3); 
+    //interMotion_root_translation_displacement=root_current_pos - root_start_pos;
+    //interMotion_root_translation_displacement.y() = 0.0;
 
     Quaterniond root_cur_start_rot= AngleAxisToQuaternion(curMotionSegment->get_start_rotation(0));
     Quaterniond root_prev_end_rot= AngleAxisToQuaternion(worldSkel->getPositions().segment(3,3));
@@ -403,7 +408,7 @@ SetActionFromStack()
     interMotion_root_rotation_displacement.x() = 0;
     interMotion_root_rotation_displacement.z() = 0;
 
-
+    play_once_done=true;
 }
 
 /// called every frameTime sec.
@@ -411,58 +416,34 @@ void Timer(int value)
 {
     if(curMotionSegment->get_end() < mFrame)
 	{
-		SetActionFromStack();
+        SetActionFromStack();
 	}
-
-	// set the positions according to the current Motion Segment
-    curMotionSegment->set_Skeleton_positions(mFrame, worldSkel);
-
+     
     // align the root
-    //Vector3d root_start_frame_position = scale* curMotionSegment->get_start_position(0);
-    //Vector3d root_cur_frame_position = scale* curMotionSegment->get_current_position(0, mFrame);
-	//root_cur_frame_position- root_start_frame_position;
-
 	Vector3d intraMotion_root_position_displacement= scale* curMotionSegment->get_current_position_displacement(0, mFrame);
-
     Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
-
-    //Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
-    //Matrix3d newWorldTranslation= root_start_frame_position+ interMotion_root_translation_displacement + intraMotion_root_rotation_displacement_M* intraMotion_root_position_displacement;
-    Vector3d prevMotion_end_position= prevMotionSegment->get_end_position(0);
     Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
-    Vector3d newWorldTranslation= prevMotion_end_position + interMotion_root_rotation_displacement_M * intraMotion_root_position_displacement;
+
+    Vector3d newWorldTranslation= prev_action_end_position + interMotion_root_rotation_displacement_M * intraMotion_root_position_displacement;
     Quaterniond newWorldRotation_quat= AngleAxisToQuaternion(interMotion_root_rotation_displacement)*AngleAxisToQuaternion(root_cur_rotation);
-
+    
     Matrix3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
-    worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
+    
     worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
+    worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
+ 
+    // set Skeleton positions (joints except root)
+    curMotionSegment->set_Skeleton_positions_except_root(mFrame, scale, worldSkel);
+       
+    TranslateViewCenter_Eye(worldSkel->getPositions().segment(0,3));
 
-	TranslateViewCenter_Eye(worldSkel->getPositions().segment(0,3));
-
-
-	/*
-	curNode= curNode->getNextNode();
-	while(curNode!=nullptr)
-	{
-		if(curNode->checkEnd())
-		{
-			curNode = curNode->getNextNode();
-			continue;
-		}
-		rotation = Vector3d(curNode->data[mFrame][0], curNode->data[mFrame][1], curNode->data[mFrame][2]);
-		worldSkel->getBodyNode(curNode->getName())->setRotation(AngleAxisToQuaternion(rotation).toRotationMatrix());
-		curNode = curNode->getNextNode();
-	}
-    */
-
-	// Motion Warping
-
+    // Motion Warping (for 10 frames)
 	if(mFrame - curMotionSegment->get_start() <= 10)
 	{
 		if(!first_call)
 		{
 			double ratio = (mFrame - curMotionSegment->get_start() )/10.0;
-			VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_position * (1-ratio);
+			VectorXd warped_position = worldSkel->getPositions() * ratio + prev_action_end_frame_Skeleton_positions * (1-ratio);
 			//VectorXd warped_position = worldSkel->getPositions() * ratio + prevMotionSegment->get_Skeleton_end_positions() * (1-ratio);
 			warped_position.segment(0,3) = worldSkel->getPositions().segment(0,3);
 	
@@ -475,8 +456,7 @@ void Timer(int value)
 		}
 		
 	}
-
-    // cout<<mFrame<<endl;
+    
 	renderScene();
 	if(play)
 		mFrame++;
@@ -898,34 +878,24 @@ Skeleton* createBVHSkeleton(const char* path)
 {
 	Skeleton* skel = new Skeleton();
 	bvhmanager = new BVHmanager();
-	cout<<"after BVHm constructor, "<<bvhmanager->get_bvh_parser_list_size()<<"| "<<bvhmanager->get_motion_segment_list_size()<<endl;
-    cout<<"0/ : "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
 
     JointNode *curNode;
-	curNode = bvhmanager->getBVHparser("walk_normal")->getRootNode();
-	 cout<<"1/: "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
-
+    curNode = bvhmanager->getBVHparser("walk_normal")->getRootNode();
 
     BodyNode* rootBody = new BodyNode(curNode->getName());
-	rootBody->setShape(0.15, 0.15, 0.15);
-	cout<<"2/: "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
+    rootBody->setShape(0.15, 0.15, 0.15);
 
-skel->setRootBodyNode(rootBody);
-	cout<<"3/: "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
+    skel->setRootBodyNode(rootBody);
 
-
-curNode = curNode->getNextNode();
-	while(curNode != nullptr)
-	{
-		if(curNode->checkEnd())
-		{
-			curNode = curNode->getNextNode();
-			     cout<<"???: "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
-
-
+    curNode = curNode->getNextNode();
+    while(curNode != nullptr)
+    {
+        if(curNode->checkEnd())
+        {
+            curNode = curNode->getNextNode();
             continue;
-		}
-		BodyNode* newBody 
+        }
+        BodyNode* newBody 
 		= new BodyNode(curNode->getName(),skel->getBodyNode(curNode->getParent()->getName()));
 		newBody->setShape(
 			fmax(0.15, fabs(curNode->getChilds()[0]->getOffset(0)*scale/2.0)), 
@@ -947,15 +917,10 @@ curNode = curNode->getNextNode();
 		
 		skel->addBodyNode(newBody);
 		curNode = curNode->getNextNode();
-        cout<<"???: "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
 
 	}
-cout<<"hmmm "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
     
     mDisplayTimeout = 1000.0*bvhmanager->getBVHparser("walk_normal")->frameTime;
-    cout<<"and now? "<<bvhmanager->getBVHparser("walk_normal")->get_all_nodes_size()<<endl;
-    cout<<"Create BVH, stop / all nodes: "<<bvhmanager->getBVHparser("stop")->get_all_nodes_size()<<endl;
-
 
     return skel;
 }
@@ -965,11 +930,10 @@ void initMotionState()
 
 	prevMotionSegment= bvhmanager->getMotionSegment("stop");
 	curMotionSegment= bvhmanager->getMotionSegment("stop");
-
-    cout<<"initMotionState() | prev MS:"<<prevMotionSegment->get_motion_name()<<endl;
-	cout<<"initMotionState() | cur MS:"<<curMotionSegment->get_motion_name()<<endl;
-
-    cout<<"curMotion allNodes:"<<curMotionSegment->get_all_nodes_size()<<endl;
+    
+    mFrame= curMotionSegment->get_start();
+    curMotionSegment->set_Skeleton_positions(mFrame, scale, worldSkel); 
+ 
     //root_translation_displacement = - curMotionSegment->get_start_position(0);
 	//root_translation_displacement.y()=0;
 
@@ -980,12 +944,13 @@ void initMotionState()
 
 	 //we have to execute SetActionFromStack
 	mFrame  = curMotionSegment->get_start()+1; //642;
-	
-    cout<<"displacement: "<<interMotion_root_rotation_displacement.transpose()<<endl;
-    cout<<"mFrame: "<<mFrame<<endl;
 
-    prev_action_end_frame_position = worldSkel->getPositions();
+   //worldSkel->setPositions(prevMotionSegment->get_Skeleton_end_positions());
+    prev_action_end_frame_Skeleton_positions = worldSkel->getPositions();
+    prev_action_end_position = scale* prev_action_end_frame_Skeleton_positions.segment(0,3);
+    
     cout<<"initMotionState() done"<<endl;
+
 }
 
 int main(int argc, char **argv) {

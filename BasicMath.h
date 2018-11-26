@@ -9,4 +9,6 @@ Eigen::Vector3d QuaternionToAngleAxis(Eigen::Quaterniond qt);
 
 /// convert log(quaternion) -> quaternion
 Eigen::Quaterniond AngleAxisToQuaternion(Eigen::Vector3d angleAxis);
+Eigen::Matrix3d AngleAxisToMatrix(Eigen::Vector3d angleAxis);
+ 
 #endif //HW4_BASICMATH_H

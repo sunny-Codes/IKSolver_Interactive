@@ -5,7 +5,11 @@
 #define MOTION_STATE_LEFT_FOOT 11
 #define MOTION_STATE_RIGHT_FOOT 12
 
-MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): bvhParser(_bvhParser), motion_name(_motion_name), start(_start), end(_end), start_state(_start_state), end_state(_end_state){}
+MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): 
+    bvhParser(_bvhParser), motion_name(_motion_name), start(_start), end(_end), start_state(_start_state), end_state(_end_state){
+        knots.push_back(0);
+        knots.push_back(end-start);
+    }
 
 //get functions
 Vector3d MotionSegment::get_current_position(int nodeNum, int frameTime){
@@ -73,18 +77,19 @@ VectorXd MotionSegment::get_Skeleton_positions(int frameTime){
 		curNode = curNode->getNextNode();
         i+= 3;
     }
+    cout<<"get_Skeleton_positions: "<<positions.transpose()<<endl;
 	return positions;
 }
 
 VectorXd MotionSegment::get_Skeleton_end_positions(){
 	return get_Skeleton_positions(end);
 }
-void MotionSegment::set_Skeleton_positions(int frameTime, Skeleton * skel){
+void MotionSegment::set_Skeleton_positions(int frameTime, float scale, Skeleton * skel){
 	JointNode* curNode= bvhParser->getRootNode();
 	int i=0;
 
 	Vector3d root_position = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
-	skel->getRootBodyNode()->setWorldTranslation(root_position);
+	skel->getRootBodyNode()->setWorldTranslation(scale*root_position);
 
 	Vector3d root_rotation = Vector3d(curNode->data[frameTime][3], curNode->data[frameTime][4], curNode->data[frameTime][5]);
     skel->getRootBodyNode()->setWorldRotation_v(root_rotation);
@@ -105,23 +110,56 @@ void MotionSegment::set_Skeleton_positions(int frameTime, Skeleton * skel){
 
 }
 
+void MotionSegment::set_Skeleton_positions_except_root(int frameTime, float scale, Skeleton * skel){
+	JointNode* curNode= bvhParser->getRootNode();
+	int i=0;
 
+    curNode= curNode->getNextNode();
+
+	while(curNode!=nullptr)
+	{
+		if(curNode->checkEnd())
+		{
+			curNode = curNode->getNextNode();
+			continue;
+		}
+		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+		skel->getBodyNode(curNode->getName())->setRotation_v(rotation);
+		curNode = curNode->getNextNode();
+	}
+
+}
+
+MotionSegment* MotionSegment::blend(MotionSegment* anotherMS, float t){
+    assert(get_knots_size()== anotherMS->get_knots_size());
+    MotionSegment* shorter= anotherMS;
+    MotionSegment* longer= this;
+    if(anotherMS->get_frame_length() > get_frame_length()) {
+        shorter= this;
+        longer= anotherMS;
+    }
+   // for(int i=0; i<shorter->)
+
+}
+
+
+/* BVHmanager */
 BVHmanager::BVHmanager()
 {
 	BVHparser* bvhParser = newBVHparser("../MotionData2/mrl/walk_fast_stright.bvh");
-    newMotionSegment(bvhParser, "walk_fast", 107, 137, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
+    newMotionSegment(bvhParser, "walk_fast", 107, 135, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
 
     bvhParser = newBVHparser("../MotionData2/mrl/walk_normal_stright.bvh");
-    newMotionSegment(bvhParser, "walk_normal", 100, 139, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
-    newMotionSegment(bvhParser, "walk_start", 66, 107, MOTION_STATE_STOP, MOTION_STATE_RIGHT_FOOT);
+    newMotionSegment(bvhParser, "walk_normal", 100, 137, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
+    newMotionSegment(bvhParser, "walk_start", 62, 99, MOTION_STATE_STOP, MOTION_STATE_RIGHT_FOOT);
     newMotionSegment(bvhParser, "walk_stop_left", 588, 641, MOTION_STATE_LEFT_FOOT, MOTION_STATE_STOP);
-    newMotionSegment(bvhParser, "walk_stop_right", 84, 897, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_STOP);
+    newMotionSegment(bvhParser, "walk_stop_right", 824, 879, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_STOP);
     newMotionSegment(bvhParser, "stop", 641, 641, MOTION_STATE_STOP, MOTION_STATE_STOP);
     newMotionSegment(bvhParser, "walk_left_to_right", 119, 139, MOTION_STATE_LEFT_FOOT, MOTION_STATE_RIGHT_FOOT);
     newMotionSegment(bvhParser, "walk_right_to_left", 100, 119, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_LEFT_FOOT);
 
     bvhParser = newBVHparser("../MotionData2/mrl/walk_slow_stright.bvh");
-	newMotionSegment(bvhParser, "walk_slow", 170, 221, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
+	newMotionSegment(bvhParser, "walk_slow", 170, 219, MOTION_STATE_RIGHT_FOOT, MOTION_STATE_RIGHT_FOOT);
    
     bvhParser = newBVHparser("../MotionData2/mrl/walk_normal_left_45.bvh");
 	newMotionSegment(bvhParser, "left_45", 119, 180, MOTION_STATE_LEFT_FOOT, MOTION_STATE_RIGHT_FOOT);

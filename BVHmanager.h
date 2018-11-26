@@ -8,8 +8,9 @@ using namespace Eigen;
 class MotionSegment{
     private:
         const char * motion_name;
-        BVHparser* bvhParser;
-        
+        //BVHparser* bvhParser;
+        vector<JointNode*> allJoints;
+
         int start;
         int end;
         int start_state;
@@ -20,16 +21,16 @@ class MotionSegment{
         MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int start, int end, int start_state, int end_state);
 
         //get functions
-        Vector3d get_current_position(int nodeNum, int frameTime);
-        Vector3d get_current_rotation(int nodeNum, int frameTime);
+        Vector3d get_current_position(int jointNum, int frameTime);
+        Vector3d get_current_rotation(int jointNum, int frameTime);
     
-        Vector3d get_start_position(int nodeNum);
-        Vector3d get_start_rotation(int nodeNum);
+        Vector3d get_start_position(int jointNum);
+        Vector3d get_start_rotation(int jointNum);
  
-        Vector3d get_end_position(int nodeNum);
-        Vector3d get_end_rotation(int nodeNum);
+        Vector3d get_end_position(int jointNum);
+        Vector3d get_end_rotation(int jointNum);
 
-        Vector3d get_current_position_displacement(int nodeNum, int frameTime);
+        Vector3d get_current_position_displacement(int jointNum, int frameTime);
 
         int get_start();
         int get_end();
@@ -46,7 +47,7 @@ class MotionSegment{
     void set_Skeleton_dofs(int frameTime, float scale, Skeleton * skel);
     void set_Skeleton_dofs_except_root(int frameTime, float scale, Skeleton * skel);
     
-    int get_all_nodes_size(){return bvhParser->get_all_nodes_size(); }
+    int get_allJoints_size(){return allJoints.size(); }
     MotionSegment* blend(MotionSegment* anotherMS, float t);
 };
 #endif

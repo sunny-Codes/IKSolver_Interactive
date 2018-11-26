@@ -48,23 +48,24 @@ public :
 class BVHparser
 {
 	const char* mPath;
-	JointNode* rootNode;
-	vector<JointNode*> allNodes;
+	JointNode* rootJoint;
+	vector<JointNode*> allJoints;
 	bool lowerBodyOnly;
 	bool upperBodyOnly;
 public :
 	BVHparser(const char* path);
 	int frames;
 	float frameTime;
-	JointNode* getRootNode();
-	JointNode* getNode(int nodeNum);
+	JointNode* getRootJoint();
+	JointNode* getJoint(int nodeNum);
 	const char* getPath();
 	void writeSkelFile();
 	void useLowerBodyOnly();
 	void useUpperBodyOnly();
 	bool isLowerBodyOnly();
 	bool isUpperBodyOnly();
-    int get_all_nodes_size(){return allNodes.size();}
+    vector<JointNode*> getAllJoints(){return allJoints;}
+    int get_allJoints_size(){return allJoints.size();}
 };
 #endif
 

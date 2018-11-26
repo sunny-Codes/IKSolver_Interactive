@@ -140,12 +140,12 @@ BVHparser::BVHparser(const char* path)
 	}
 	getline(in, line);										//ROOT Hips
 	lineNum++;
-	rootNode = new JointNode();
-	rootNode->setRoot();
+	rootJoint = new JointNode();
+	rootJoint->setRoot();
 	
-    allNodes= vector<JointNode*>();
-    //cout<<"before puting rootNode/ allNodes size: "<<allNodes.size()<<endl;
-    allNodes.push_back(rootNode);
+    allJoints= vector<JointNode*>();
+    //cout<<"before puting rootJoint/ allJoints size: "<<allJoints.size()<<endl;
+    allJoints.push_back(rootJoint);
     
     istringstream s(line);
 	string bvh_keyword;
@@ -157,14 +157,14 @@ BVHparser::BVHparser(const char* path)
 		cout << line<<endl;
 		exit(-1);
 	}
-	rootNode->setName(bvh_nodeName);
+	rootJoint->setName(bvh_nodeName);
 	getline(in, line);										//{
 
 	getline(in, line);										//	OFFSET 0.00 0.00 0.00
 	s.str("");
 	s = istringstream(line);
 	s >> bvh_keyword; s >> offx; s >> offy; s >> offz;
-	rootNode->setOffset(offx, offy -90.0, offz);
+	rootJoint->setOffset(offx, offy -90.0, offz);
 
 
 	getline(in, line);										//	CHANNELS 6 Xposition Yposition Zposition Xrotation Yrotation Zrotation
@@ -181,10 +181,10 @@ BVHparser::BVHparser(const char* path)
 			newAxisOrder += channels[i][0];
 		}
 	}
-	rootNode->setAxisOrder(newAxisOrder);
-	rootNode->setChannelNum(channelNum);
-	JointNode* prevNode = rootNode;
-	JointNode* prevNode4NextNode = rootNode;
+	rootJoint->setAxisOrder(newAxisOrder);
+	rootJoint->setChannelNum(channelNum);
+	JointNode* prevJoint = rootJoint;
+	JointNode* prevJoint4NextNode = rootJoint;
 	getline(in, line);
 	while(line.compare(0, 6, "MOTION") != 0)						
 	{
@@ -194,10 +194,10 @@ BVHparser::BVHparser(const char* path)
 		s >> bvh_keyword; s >> bvh_nodeName;
 		if(bvh_keyword=="JOINT")							//	JOINT LeftUpLeg
 		{
-			JointNode *newNode = new JointNode();
-			newNode->setName(bvh_nodeName);
-            allNodes.push_back(newNode);
-            //cout<<"allNodes:"<<allNodes.size()<<endl;
+			JointNode *newJoint = new JointNode();
+			newJoint->setName(bvh_nodeName);
+            allJoints.push_back(newJoint);
+            //cout<<"allJoints:"<<allJoints.size()<<endl;
 			//cout << bvh_nodeName <<endl;	//print to check
 
 			getline(in, line);								//	{
@@ -205,7 +205,7 @@ BVHparser::BVHparser(const char* path)
 			s.str("");
 			s = istringstream(line);
 			s >> bvh_keyword; s >> offx; s >> offy; s >> offz;
-			newNode->setOffset(offx, offy, offz);
+			newJoint->setOffset(offx, offy, offz);
 
 			getline(in, line);								//		CHANNELS 3 Xrotation Yrotation Zrotation
 			s.str("");
@@ -222,34 +222,34 @@ BVHparser::BVHparser(const char* path)
 					newAxisOrder += channels[i][0];
 				}
 			}
-			newNode->setParent(prevNode);
-			newNode->setChannelNum(channelNum);
-			newNode->setAxisOrder(newAxisOrder);
-			prevNode4NextNode->setNext(newNode);
-			prevNode = newNode;
-			prevNode4NextNode = newNode;	
+			newJoint->setParent(prevJoint);
+			newJoint->setChannelNum(channelNum);
+			newJoint->setAxisOrder(newAxisOrder);
+			prevJoint4NextNode->setNext(newJoint);
+			prevJoint = newJoint;
+			prevJoint4NextNode = newJoint;	
         }
 		else if(bvh_keyword =="End")						//	End Site
 		{
-			JointNode *newNode = new JointNode();
-			allNodes.push_back(newNode);
-            //cout<<"allNodes:"<<allNodes.size()<<endl;
-            newNode->setName(prevNode->getName()+bvh_nodeName);
-			newNode->setEnd();
+			JointNode *newJoint = new JointNode();
+			allJoints.push_back(newJoint);
+            //cout<<"allJoints:"<<allJoints.size()<<endl;
+            newJoint->setName(prevJoint->getName()+bvh_nodeName);
+			newJoint->setEnd();
 			getline(in, line);								//	{
 			getline(in, line);								//		OFFSET 3.64953 0.00000 0.00000
 			s.str("");
 			s = istringstream(line);
 			s >> bvh_keyword; s >> offx; s >> offy; s >> offz;
-			newNode->setOffset(offx, offy, offz);
+			newJoint->setOffset(offx, offy, offz);
 
-			newNode->setParent(prevNode);
+			newJoint->setParent(prevJoint);
 
 			getline(in, line);								//	}
 		}
 		else if(bvh_keyword =="}")
 		{
-			prevNode = prevNode->getParent();
+			prevJoint = prevJoint->getParent();
 		}
 		else
 		{
@@ -259,7 +259,7 @@ BVHparser::BVHparser(const char* path)
 		getline(in, line);
 	}
 
-       // cout<<"after parsing basic structure | allNodes: "<<allNodes.size()<<endl;
+       // cout<<"after parsing basic structure | allJoints: "<<allJoints.size()<<endl;
 // 	Start JointNode										//MOTION
 	string str1, str2;	//to get the string for format
 	float fvalue;
@@ -278,51 +278,51 @@ BVHparser::BVHparser(const char* path)
 	// cout << "frames : " << frames <<", frame time : " << frameTime << endl;
 
 	float f[6];
-	JointNode *curNode;
-	curNode = rootNode;
-	while(curNode != nullptr)
+	JointNode *curJoint;
+	curJoint = rootJoint;
+	while(curJoint != nullptr)
 	{
-		curNode->initData(frames);
-		curNode = curNode->getNextNode();
+		curJoint->initData(frames);
+		curJoint = curJoint->getNextNode();
 	}
 
 	for(int i = 0; i < frames; i++)
 	{
-		curNode = rootNode;
+		curJoint = rootJoint;
 		getline(in, line);
 		s.str("");
 		s = istringstream(line);
-		while(curNode != nullptr)
+		while(curJoint != nullptr)
 		{
-			for(int j = 0; j < curNode->getChannelNum(); j++)
+			for(int j = 0; j < curJoint->getChannelNum(); j++)
 			{
 				s >> f[j];
-				curNode->data[i][j] = f[j];
+				curJoint->data[i][j] = f[j];
 			}
-			curNode = curNode->getNextNode();
+			curJoint = curJoint->getNextNode();
 		}
 
 	}
 	Eigen::Quaterniond q;
 	Eigen::Vector3d euler;
-	curNode = rootNode;
+	curJoint = rootJoint;
 	for(int i = 0; i < frames; i++)
 	{
 		q = Eigen::Quaterniond::Identity();
 		//q = q * Eigen::AngleAxisd(M_PI/2.0, Eigen::Vector3d::UnitY());
 		for(int j = 0; j < 3; j++)
 		{
-			if(curNode->getAxisOrder().substr(j,1).compare("x") == 0)
+			if(curJoint->getAxisOrder().substr(j,1).compare("x") == 0)
 			{
-				q = q * Eigen::AngleAxisd(curNode->data[i][j+3]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitX());
+				q = q * Eigen::AngleAxisd(curJoint->data[i][j+3]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitX());
 			}
-			else if(curNode->getAxisOrder().substr(j,1).compare("y") == 0)
+			else if(curJoint->getAxisOrder().substr(j,1).compare("y") == 0)
 			{
-				q = q * Eigen::AngleAxisd(curNode->data[i][j+3]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitY());
+				q = q * Eigen::AngleAxisd(curJoint->data[i][j+3]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitY());
 			}
 			else
 			{
-				q = q * Eigen::AngleAxisd(curNode->data[i][j+3]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitZ());
+				q = q * Eigen::AngleAxisd(curJoint->data[i][j+3]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitZ());
 			}
 		}
 
@@ -333,7 +333,7 @@ BVHparser::BVHparser(const char* path)
 		/*
 		for(int j = 0; j < 3; j++)
 		{
-			curNode->data[i][j+3] = euler[j];
+			curJoint->data[i][j+3] = euler[j];
 		}
 		*/
 		float theta;
@@ -341,34 +341,34 @@ BVHparser::BVHparser(const char* path)
 		//cout<< q.w()*q.w() + q.x()*q.x() + q.y()*q.y() + q.z()*q.z() <<endl;
 		Eigen::Vector3d root_axis = Eigen::Vector3d(q.x(), q.y(), q.z());
 		root_axis.normalize();
-		curNode->data[i][3] = theta * root_axis.x();
-		curNode->data[i][4] = theta * root_axis.y();
-		curNode->data[i][5] = theta * root_axis.z();
+		curJoint->data[i][3] = theta * root_axis.x();
+		curJoint->data[i][4] = theta * root_axis.y();
+		curJoint->data[i][5] = theta * root_axis.z();
 
 		for(int j = 0; j < 3; j++)
 		{
-			//curNode->data[i][j] -= 50.0f;
+			//curJoint->data[i][j] -= 50.0f;
 		}
 	}
-	curNode = curNode->getNextNode();
-	while(curNode != nullptr)
+	curJoint = curJoint->getNextNode();
+	while(curJoint != nullptr)
 	{
 		for(int i = 0; i < frames; i++)
 		{
 			q = Eigen::Quaterniond::Identity();
 			for(int j = 0; j < 3; j++)
 			{
-				if(curNode->getAxisOrder().substr(j,1).compare("x") == 0)
+				if(curJoint->getAxisOrder().substr(j,1).compare("x") == 0)
 				{
-					q = q * Eigen::AngleAxisd(curNode->data[i][j]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitX());
+					q = q * Eigen::AngleAxisd(curJoint->data[i][j]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitX());
 				}
-				else if(curNode->getAxisOrder().substr(j,1).compare("y") == 0)
+				else if(curJoint->getAxisOrder().substr(j,1).compare("y") == 0)
 				{
-					q = q * Eigen::AngleAxisd(curNode->data[i][j]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitY());
+					q = q * Eigen::AngleAxisd(curJoint->data[i][j]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitY());
 				}
 				else
 				{
-					q = q * Eigen::AngleAxisd(curNode->data[i][j]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitZ());
+					q = q * Eigen::AngleAxisd(curJoint->data[i][j]/360.0 * 2.0 * M_PI, Eigen::Vector3d::UnitZ());
 				}
 			}
 
@@ -379,30 +379,30 @@ BVHparser::BVHparser(const char* path)
 			//cout<< q.w()*q.w() + q.x()*q.x() + q.y()*q.y() + q.z()*q.z() <<endl;
 			Eigen::Vector3d root_axis = Eigen::Vector3d(q.x(), q.y(), q.z());
 			root_axis.normalize();
-			curNode->data[i][0] = theta * root_axis.x();
-			curNode->data[i][1] = theta * root_axis.y();
-			curNode->data[i][2] = theta * root_axis.z();
+			curJoint->data[i][0] = theta * root_axis.x();
+			curJoint->data[i][1] = theta * root_axis.y();
+			curJoint->data[i][2] = theta * root_axis.z();
 
 			// for(int j = 0; j < 3; j++)
 			// {
-			// 	curNode->data[i][j] = euler[j];
+			// 	curJoint->data[i][j] = euler[j];
 			// }
-			//curNode->data[i][2] = - euler[2];
+			//curJoint->data[i][2] = - euler[2];
 		}
-		curNode = curNode->getNextNode();
+		curJoint = curJoint->getNextNode();
 	}
 
-    cout<<"after parsing all | "<<path<<" | allNodes size= "<<allNodes.size()<<endl;
+    cout<<"after parsing all | "<<path<<" | allJoints size= "<<allJoints.size()<<endl;
 }
 
-JointNode* BVHparser::getRootNode()
+JointNode* BVHparser::getRootJoint()
 {
-	return rootNode;
+	return rootJoint;
 }
 
-JointNode* BVHparser::getNode(int nodeNum)
+JointNode* BVHparser::getJoint(int nodeNum)
 {
-    return allNodes[nodeNum];
+    return allJoints[nodeNum];
 }
 
 

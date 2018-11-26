@@ -6,42 +6,47 @@
 #define MOTION_STATE_RIGHT_FOOT 12
 
 MotionSegment::MotionSegment(BVHparser * _bvhParser, const char* _motion_name, int _start, int _end, int _start_state, int _end_state): 
-    bvhParser(_bvhParser), motion_name(_motion_name), start(_start), end(_end), start_state(_start_state), end_state(_end_state){
+    //bvhParser(_bvhParser), 
+    motion_name(_motion_name), start(_start), end(_end), start_state(_start_state), end_state(_end_state){
+        allJoints= _bvhParser->getAllJoints();
         knots.push_back(0);
         knots.push_back(end-start);
     }
 
 //get functions
-Vector3d MotionSegment::get_current_position(int nodeNum, int frameTime){
-    double x= bvhParser->getNode(nodeNum)->data[frameTime][0];
-    double y= bvhParser->getNode(nodeNum)->data[frameTime][1];
-    double z= bvhParser->getNode(nodeNum)->data[frameTime][2];
+Vector3d MotionSegment::get_current_position(int jointNum, int frameTime){
+    double x= allJoints[jointNum]->data[frameTime][0];
+    double y= allJoints[jointNum]->data[frameTime][1];
+    double z= allJoints[jointNum]->data[frameTime][2];
     return Vector3d(x,y,z);
 }
-Vector3d MotionSegment::get_current_rotation(int nodeNum, int frameTime){
-    double x= bvhParser->getNode(nodeNum)->data[frameTime][3];
-    double y= bvhParser->getNode(nodeNum)->data[frameTime][4];
-    double z= bvhParser->getNode(nodeNum)->data[frameTime][5];
+Vector3d MotionSegment::get_current_rotation(int jointNum, int frameTime){
+    double x= allJoints[jointNum]->data[frameTime][3];
+    double y= allJoints[jointNum]->data[frameTime][4];
+    double z= allJoints[jointNum]->data[frameTime][5];
+    //double x= bvhParser->getNode(jointNum)->data[frameTime][3];
+    //double y= bvhParser->getNode(jointNum)->data[frameTime][4];
+    //double z= bvhParser->getNode(jointNum)->data[frameTime][5];
     return Vector3d(x,y,z);
 }
 
-Vector3d MotionSegment::get_start_position(int nodeNum){
-    return get_current_position(nodeNum, start);
+Vector3d MotionSegment::get_start_position(int jointNum){
+    return get_current_position(jointNum, start);
 }
 
-Vector3d MotionSegment::get_start_rotation(int nodeNum){
-    return get_current_rotation(nodeNum, start);
+Vector3d MotionSegment::get_start_rotation(int jointNum){
+    return get_current_rotation(jointNum, start);
 }
 
-Vector3d MotionSegment::get_end_position(int nodeNum){
-    return get_current_position(nodeNum, end);
+Vector3d MotionSegment::get_end_position(int jointNum){
+    return get_current_position(jointNum, end);
 }
-Vector3d MotionSegment::get_end_rotation(int nodeNum){
-    return get_current_rotation(nodeNum, end);
+Vector3d MotionSegment::get_end_rotation(int jointNum){
+    return get_current_rotation(jointNum, end);
 }
 
-Vector3d MotionSegment::get_current_position_displacement(int nodeNum, int frameTime){
-	return get_current_position(nodeNum, frameTime)- get_current_position(nodeNum, start);
+Vector3d MotionSegment::get_current_position_displacement(int jointNum, int frameTime){
+	return get_current_position(jointNum, frameTime)- get_current_position(jointNum, start);
 }
 
 
@@ -54,27 +59,27 @@ const char*  MotionSegment::get_motion_name(){return motion_name;}
 VectorXd MotionSegment::get_Skeleton_dofs(int frameTime){
 	VectorXd dofs;
 
-	JointNode* curNode= bvhParser->getRootNode();
+	JointNode* curJoint= allJoints[0]; //bvhParser->getRootJoint();
 	int i=0;
 
-	Vector3d root_position = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+	Vector3d root_position = Vector3d(curJoint->data[frameTime][0], curJoint->data[frameTime][1], curJoint->data[frameTime][2]);
     dofs.segment(i,3)= root_position;
     i+= 3;
-	Vector3d root_rotation = Vector3d(curNode->data[frameTime][3], curNode->data[frameTime][4], curNode->data[frameTime][5]);
+	Vector3d root_rotation = Vector3d(curJoint->data[frameTime][3], curJoint->data[frameTime][4], curJoint->data[frameTime][5]);
 	dofs.segment(i,3)= root_rotation;
 	i+= 3;
 
-	curNode= curNode->getNextNode();
-	while(curNode!=nullptr)
+	curJoint= curJoint->getNextNode();
+	while(curJoint!=nullptr)
 	{
-		if(curNode->checkEnd())
+		if(curJoint->checkEnd())
 		{
-			curNode = curNode->getNextNode();
+			curJoint = curJoint->getNextNode();
 			continue;
 		}
-		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+		Vector3d rotation = Vector3d(curJoint->data[frameTime][0], curJoint->data[frameTime][1], curJoint->data[frameTime][2]);
 		dofs.segment(i,3)= rotation; // angle-axis
-		curNode = curNode->getNextNode();
+		curJoint = curJoint->getNextNode();
         i+= 3;
     }
     cout<<"get_Skeleton_dofs: "<<dofs.transpose()<<endl;
@@ -85,47 +90,47 @@ VectorXd MotionSegment::get_Skeleton_end_dofs(){
 	return get_Skeleton_dofs(end);
 }
 void MotionSegment::set_Skeleton_dofs(int frameTime, float scale, Skeleton * skel){
-	JointNode* curNode= bvhParser->getRootNode();
+	JointNode* curJoint= allJoints[0]; //bvhParser->getRootJoint();
 	int i=0;
 
-	Vector3d root_position = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
+	Vector3d root_position = Vector3d(curJoint->data[frameTime][0], curJoint->data[frameTime][1], curJoint->data[frameTime][2]);
 	skel->getRootBodyNode()->setWorldTranslation(scale*root_position);
 
-	Vector3d root_rotation = Vector3d(curNode->data[frameTime][3], curNode->data[frameTime][4], curNode->data[frameTime][5]);
+	Vector3d root_rotation = Vector3d(curJoint->data[frameTime][3], curJoint->data[frameTime][4], curJoint->data[frameTime][5]);
     skel->getRootBodyNode()->setWorldRotation_v(root_rotation);
 
-    curNode= curNode->getNextNode();
+    curJoint= curJoint->getNextNode();
 
-	while(curNode!=nullptr)
+	while(curJoint!=nullptr)
 	{
-		if(curNode->checkEnd())
+		if(curJoint->checkEnd())
 		{
-			curNode = curNode->getNextNode();
+			curJoint = curJoint->getNextNode();
 			continue;
 		}
-		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
-		skel->getBodyNode(curNode->getName())->setRotation_v(rotation);
-		curNode = curNode->getNextNode();
+		Vector3d rotation = Vector3d(curJoint->data[frameTime][0], curJoint->data[frameTime][1], curJoint->data[frameTime][2]);
+		skel->getBodyNode(curJoint->getName())->setRotation_v(rotation);
+		curJoint = curJoint->getNextNode();
 	}
 
 }
 
 void MotionSegment::set_Skeleton_dofs_except_root(int frameTime, float scale, Skeleton * skel){
-	JointNode* curNode= bvhParser->getRootNode();
+	JointNode* curJoint= allJoints[0]; //bvhParser->getRootJoint();
 	int i=0;
 
-    curNode= curNode->getNextNode();
+    curJoint= curJoint->getNextNode();
 
-	while(curNode!=nullptr)
+	while(curJoint!=nullptr)
 	{
-		if(curNode->checkEnd())
+		if(curJoint->checkEnd())
 		{
-			curNode = curNode->getNextNode();
+			curJoint = curJoint->getNextNode();
 			continue;
 		}
-		Vector3d rotation = Vector3d(curNode->data[frameTime][0], curNode->data[frameTime][1], curNode->data[frameTime][2]);
-		skel->getBodyNode(curNode->getName())->setRotation_v(rotation);
-		curNode = curNode->getNextNode();
+		Vector3d rotation = Vector3d(curJoint->data[frameTime][0], curJoint->data[frameTime][1], curJoint->data[frameTime][2]);
+		skel->getBodyNode(curJoint->getName())->setRotation_v(rotation);
+		curJoint = curJoint->getNextNode();
 	}
 
 }
@@ -197,8 +202,8 @@ void BVHmanager::newMotionSegment(BVHparser* bvhparser, const char* motion_name,
      cout<<"bvhparser: "<<bvhparser->getPath()<<endl;
    MotionSegment* motionSegment= new MotionSegment(bvhparser, motion_name, start, end, start_state, end_state);
     motionSegment_list.push_back(*motionSegment);
-    cout<<"motionSegment, all nodes;"<<motionSegment->get_all_nodes_size()<<endl;
-    cout<<motion_name<<" constructed using "<<bvhparser->getPath()<<" , allNodes:"<<bvhparser->get_all_nodes_size()<<endl;
+    cout<<"motionSegment, all nodes;"<<motionSegment->get_allJoints_size()<<endl;
+    cout<<motion_name<<" constructed using "<<bvhparser->getPath()<<" , allJoints:"<<bvhparser->get_allJoints_size()<<endl;
 }
 
 MotionSegment* BVHmanager::getMotionSegment(const char*action){

@@ -880,7 +880,7 @@ Skeleton* createBVHSkeleton(const char* path)
 	bvhmanager = new BVHmanager();
 
     JointNode *curNode;
-    curNode = bvhmanager->getBVHparser("walk_normal")->getRootNode();
+    curNode = bvhmanager->getBVHparser("walk_normal")->getRootJoint();
 
     BodyNode* rootBody = new BodyNode(curNode->getName());
     rootBody->setShape(0.15, 0.15, 0.15);

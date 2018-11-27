@@ -123,6 +123,23 @@ VectorXd MotionSegment::get_Skeleton_end_dofs(){
     return get_Skeleton_dofs(get_frame_length()-1);
 }
 
+void MotionSegment::set_Skeleton_dofs(VectorXd dofs, float scale, Skeleton * skel){
+	int i = 0;
+
+	Vector3d root_position = dofs.segment(i, 3);
+	i += 3;
+	skel->getRootBodyNode()->setWorldTranslation(scale*root_position);
+
+	Vector3d root_rotation = dofs.segment(i, 3);
+	i += 3;
+    skel->getRootBodyNode()->setWorldRotation_v(root_rotation);
+    
+    for(int i=1; i<rotation_dof_order.size(); i++){
+        Vector3d rotation = dofs.segment(3*i+3, 3);
+        skel->getBodyNode(rotation_dof_order[i])->setRotation_v(rotation);
+    }
+}
+
 void MotionSegment::set_Skeleton_bodyNode(int frameTime, float scale, Skeleton * skel){
     //JointNode* curJoint= allJoints[0]; //bvhParser->getRootJoint();
 
@@ -136,7 +153,13 @@ void MotionSegment::set_Skeleton_bodyNode(int frameTime, float scale, Skeleton *
         Vector3d joint_rotation = get_current_rotation(i, frameTime);
         skel->getBodyNode(rotation_dof_order[i])->setRotation_v(joint_rotation);
     }
-    
+}
+
+void MotionSegment::set_Skeleton_dofs_except_root(VectorXd dofs, float scale, Skeleton * skel){
+    for(int i=1; i<rotation_dof_order.size(); i++){
+        Vector3d rotation = dofs.segment(3*i+3, 3);
+        skel->getBodyNode(rotation_dof_order[i])->setRotation_v(rotation);
+    }
 }
 
 void MotionSegment::set_Skeleton_bodyNode(Vector3d root_position, Vector3d root_rotation, int frameTime, Skeleton * skel){
@@ -483,4 +506,128 @@ getStartEndFrame(const char* action, int* start, int* end, int* start_motion_sta
         cout<<"Not valid action "<<action<<endl;
         exit(1);
     }
+}
+
+string
+StackToAction(BVHmanager* bvhmanager)
+{
+	if(bvhmanager->CONTROL_leftTurn_stack == 1)
+		return "left_45";
+	else if(bvhmanager->CONTROL_leftTurn_stack == 2)
+		return "left_90";
+	else if(bvhmanager->CONTROL_leftTurn_stack >= 3)
+		return "left_135";
+	else if(bvhmanager->CONTROL_leftTurn_stack == -1)
+		return "right_45";
+	else if(bvhmanager->CONTROL_leftTurn_stack == -2)
+		return "right_90";
+	else if(bvhmanager->CONTROL_leftTurn_stack <= -3)
+		return "right_135";
+		//here CONTROL_leftTurn_stack is 0
+	else if(bvhmanager->CONTROL_front_stack <= 0)
+	{
+		if(bvhmanager->MOTION_STATE == MOTION_STATE_LEFT_FOOT)
+			return "walk_stop_left";
+		else if(bvhmanager->MOTION_STATE == MOTION_STATE_RIGHT_FOOT)
+			return "walk_stop_right";
+		else
+			return "stop";
+	}
+	else if(bvhmanager->CONTROL_front_stack == 1)
+		return "walk_slow";
+	else if(bvhmanager->CONTROL_front_stack == 2)
+		return "walk_normal";
+	else if(bvhmanager->CONTROL_front_stack >= 3)
+		return "walk_fast";
+	cout<<"there is a bug on StackToAction"<<endl;
+	return "";
+}
+
+void BVHmanager::next() {
+	float scale = 0.05;
+	if(curMotionSegment->get_frame_length() < mFrame)
+	{
+		MotionSegment * StackMotion= getMotionSegment(StackToAction(this).c_str());
+
+		if(MOTION_STATE == StackMotion->get_start_state())
+		{
+			cout<<curMotionSegment->get_motion_name()<<endl;
+
+			prevMotionSegment= curMotionSegment;
+			curMotionSegment= StackMotion;
+
+			CONTROL_leftTurn_stack = 0;	//we will turn. so reset the left turn stack.
+		}
+		else if(MOTION_STATE == MOTION_STATE_LEFT_FOOT
+				&& StackMotion->get_start_state() == MOTION_STATE_RIGHT_FOOT)
+		{
+			prevMotionSegment = curMotionSegment;
+			curMotionSegment= getMotionSegment("walk_left_to_right");
+		}
+		else if(MOTION_STATE == MOTION_STATE_RIGHT_FOOT
+				&& StackMotion->get_start_state() == MOTION_STATE_LEFT_FOOT)
+		{
+			prevMotionSegment= curMotionSegment;
+			curMotionSegment= getMotionSegment("walk_right_to_left");
+		}
+			// if curent step is stop and we want to turn left, we add walk_start to move it.
+		else if(MOTION_STATE == MOTION_STATE_STOP
+				&& StackMotion->get_start_state() != MOTION_STATE_STOP)
+		{
+			prevMotionSegment= curMotionSegment;
+			curMotionSegment= getMotionSegment("walk_start");
+		}
+		else
+		{
+			cout<<"stack : "<<CONTROL_front_stack<<endl;
+			//cout<<"why else ? prev/cur action is "<<prev_action<<" / "<<cur_action<<endl;
+			cout<<"why else ? prev/cur action is "<<prevMotionSegment->get_motion_name()<<" / "<<curMotionSegment->get_motion_name()<<endl;
+		}
+
+
+		mFrame = 0; //curMotionSegment->get_start(); //start_frame;
+		MOTION_STATE = curMotionSegment->get_end_state(); //end_motion_state;
+
+		// set interMotion_root_translation/rotation_displacement : DO IT HERE, cause no need to compute this all the time
+		prev_action_end_frame_Skeleton_dofs = worldSkel->getDofs(); //.segment(0,3);
+
+		prev_action_end_position= prev_action_end_frame_Skeleton_dofs.segment(0,3);
+
+		Vector3d root_start_pos= curMotionSegment->get_start_root_position()*scale;
+
+		Vector3d root_current_pos= worldSkel->getDofs().segment(0,3);
+		//interMotion_root_translation_displacement=root_current_pos - root_start_pos;
+		//interMotion_root_translation_displacement.y() = 0.0;
+
+		Quaterniond root_cur_start_rot= AngleAxisToQuaternion(curMotionSegment->get_start_rotation(0));
+		Quaterniond root_prev_end_rot= AngleAxisToQuaternion(worldSkel->getDofs().segment(3,3));
+		Quaterniond root_rotation_displacement_quat = root_prev_end_rot* root_cur_start_rot.inverse();
+
+		interMotion_root_rotation_displacement= QuaternionToAngleAxis(root_rotation_displacement_quat);
+		interMotion_root_rotation_displacement.x() = 0;
+		interMotion_root_rotation_displacement.z() = 0;
+	}
+
+	// align the root
+	Vector3d intraMotion_root_position_displacement =
+			scale * curMotionSegment->get_current_root_position_displacement(mFrame);
+	Vector3d root_cur_rotation = curMotionSegment->get_current_rotation(0, mFrame);
+	Matrix3d interMotion_root_rotation_displacement_M = AngleAxisToQuaternion(
+			interMotion_root_rotation_displacement).toRotationMatrix();
+
+	Vector3d newWorldTranslation = prev_action_end_position +
+								   interMotion_root_rotation_displacement_M * intraMotion_root_position_displacement;
+	Quaterniond newWorldRotation_quat = AngleAxisToQuaternion(interMotion_root_rotation_displacement) *
+										AngleAxisToQuaternion(root_cur_rotation);
+
+	Matrix3d newWorldRotation = newWorldRotation_quat.toRotationMatrix();
+
+	worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
+	worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
+
+	VectorXd dofs = curMotionSegment->get_Skeleton_dofs(mFrame);
+	// set Skeleton dofs (joints except root)
+	curMotionSegment->set_Skeleton_dofs_except_root(dofs, scale, worldSkel);
+
+	mFrame++;
 }

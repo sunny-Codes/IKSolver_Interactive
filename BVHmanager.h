@@ -70,6 +70,9 @@ class MotionSegment{
         VectorXd get_Skeleton_dofs(int frameTime);
         VectorXd get_Skeleton_end_dofs();
 
+        void set_Skeleton_dofs(VectorXd dofs, float scale, Skeleton * skel);
+        void set_Skeleton_dofs_except_root(VectorXd dofs, float scale, Skeleton * skel);
+ 
         void set_Skeleton_bodyNode(int frameTime, float scale, Skeleton * skel);
         void set_Skeleton_bodyNode(Vector3d root_position, Vector3d root_rotation,int frmaeTime, Skeleton * skel);
     
@@ -101,10 +104,22 @@ public:
     //add functions
     BVHparser* newBVHparser(const char* action);
     void newMotionSegment(BVHparser* bvhparser, const char* motion_name, int start, int end, int start_state, int end_state);
+    void next();
 
     //member variables
+	MotionSegment* curMotionSegment;
+	MotionSegment* prevMotionSegment;
+	Skeleton* worldSkel;
+	int mFrame = 0;
     std::vector<BVHparser> bvhParser_list;
     std::vector<MotionSegment> motionSegment_list;
+
+    Vector3d prev_action_end_position;
+	VectorXd prev_action_end_frame_Skeleton_dofs;
+	int MOTION_STATE;
+    int CONTROL_front_stack = 0;
+    int CONTROL_leftTurn_stack = 0;
+	Vector3d interMotion_root_rotation_displacement;
 };
 
 #endif

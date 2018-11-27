@@ -47,7 +47,7 @@ MotionSegment::MotionSegment(BVHparser * bvhParser, const char* _motion_name, in
             Vector3d root_rotation = Vector3d(curJoint->data[frameTime][3], curJoint->data[frameTime][4], curJoint->data[frameTime][5]);
             mf.add_rotation(root_rotation);
 
-            rotation_dof_order.push_back(curJoint->getName());
+            if(frameTime==start) rotation_dof_order.push_back(curJoint->getName());
             curJoint= curJoint->getNextNode();
             while(curJoint!=nullptr)
             {
@@ -57,11 +57,12 @@ MotionSegment::MotionSegment(BVHparser * bvhParser, const char* _motion_name, in
                     continue;
                 }
                 Vector3d rotation = Vector3d(curJoint->data[frameTime][0], curJoint->data[frameTime][1], curJoint->data[frameTime][2]);
-                rotation_dof_order.push_back(curJoint->getName());
+                if(frameTime==start) rotation_dof_order.push_back(curJoint->getName());
                 mf.add_rotation(rotation);
                
                 curJoint = curJoint->getNextNode();
             }
+            assert(mf.rotations.size()== rotation_dof_order.size());
             motionFrames.push_back(mf);
         }
         knots.push_back(0);
@@ -140,10 +141,9 @@ void MotionSegment::set_Skeleton_bodyNode(int frameTime, float scale, Skeleton *
 }
 
 void MotionSegment::set_Skeleton_bodyNode(Vector3d root_position, Vector3d root_rotation, int frameTime, Skeleton * skel){
-    skel->getRootBodyNode()->setWorldTranslation(root_position); //assume: already scaled
     skel->getRootBodyNode()->setWorldRotation_v(root_rotation);
-
-    for(int i=1; i<rotation_dof_order.size(); i++){
+    skel->getRootBodyNode()->setWorldTranslation(root_position); //assume: already scaled
+     for(int i=1; i<rotation_dof_order.size(); i++){
         Vector3d joint_rotation = get_current_rotation(i, frameTime);
         skel->getBodyNode(rotation_dof_order[i])->setRotation_v(joint_rotation);
     }

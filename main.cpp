@@ -408,7 +408,6 @@ SetActionFromStack()
     interMotion_root_rotation_displacement.x() = 0;
     interMotion_root_rotation_displacement.z() = 0;
 
-    cout<<"setActionFromStack/ "<<root_cur_start_rot.w()<<" "<<root_cur_start_rot.vec().transpose()<<endl;
     play_once_done=true;
 }
 
@@ -431,7 +430,6 @@ void Timer(int value)
     Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
     Quaterniond newWorldRotation_quat= AngleAxisToQuaternion(interMotion_root_rotation_displacement)*AngleAxisToQuaternion(root_cur_rotation);
     
-    cout<<"newWorldRot quat: "<<newWorldRotation_quat.w()<<" "<<newWorldRotation_quat.vec().transpose()<<endl;
     //Matrix3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
     Vector3d newWorldRotation= QuaternionToAngleAxis(newWorldRotation_quat);
 

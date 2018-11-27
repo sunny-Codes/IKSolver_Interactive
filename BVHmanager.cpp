@@ -6,7 +6,6 @@
 #define MOTION_STATE_RIGHT_FOOT 12
 
 /* MotionFrame */
-
 MotionFrame::MotionFrame(){
 }
 MotionFrame::MotionFrame(Vector3d _root_position, vector<Vector3d> _rotations){
@@ -149,7 +148,7 @@ void MotionSegment::set_Skeleton_bodyNode(Vector3d root_position, Vector3d root_
     }
 
 }
-
+/*
 MotionSegment* MotionSegment::blend(MotionSegment* anotherMS, float t){
     assert(get_knots_size()== anotherMS->get_knots_size());
     MotionSegment* shorter= anotherMS;
@@ -160,7 +159,7 @@ MotionSegment* MotionSegment::blend(MotionSegment* anotherMS, float t){
     }
     // for(int i=0; i<shorter->)
 }
-
+*/
 VectorXd dofSlerp(VectorXd dof, VectorXd dof2, float t){
     assert(dof.size()== dof2.size());
     VectorXd slerped(dof.size());
@@ -176,12 +175,12 @@ VectorXd dofSlerp(VectorXd dof, VectorXd dof2, float t){
 
 float dofDistance(VectorXd dof, VectorXd dof2){
     assert(dof.size()== dof2.size());
-
     VectorXd displacement= dof-dof2;
     displacement.segment(0,3)=Vector3d(0,0,0);
     return displacement.norm();
 }
 
+/*
 MotionSegment* MotionSegment::dynamicTimeWarping(MotionSegment* anotherMS, float t){
     int length= get_frame_length();
     int length2= anotherMS->get_frame_length();
@@ -190,44 +189,55 @@ MotionSegment* MotionSegment::dynamicTimeWarping(MotionSegment* anotherMS, float
     vector<vector<int>> pairs;
     int i= 0;
     int j= 0;
-    vector<int> pair= vector<int>();
-    pair.push_back(j);
+    vector<int> p= vector<int>();
+    p.push_back(j);
 
-    while(pair.size()< length && j<length2){
-        float right= dofDistance(get_Skeleton_dofs(i), anotherMS->get_Skeleton_dofs(j+1));
-        float down= dofDistance(get_Skeleton_dofs(i+1), anotherMS->get_Skeleton_dofs(j));
-        float diagonal= dofDistance(get_Skeleton_dofs(i+1), anotherMS->get_Skeleton_dofs(j+1));
-
+    cout<<"length: "<<length<<", length2= "<<length2<<endl;
+    while(pairs.size()< length && j<length2){
+        int inext= (i==length-1)? length-1: i+1;
+        int jnext= (j==length2-1)? length2-1: j+1;
+        float right= dofDistance(get_Skeleton_dofs(i), anotherMS->get_Skeleton_dofs(jnext));
+        float down= dofDistance(get_Skeleton_dofs(inext), anotherMS->get_Skeleton_dofs(j));
+        float diagonal= dofDistance(get_Skeleton_dofs(inext), anotherMS->get_Skeleton_dofs(jnext));
+        cout<<"right: "<<right<<"down: "<<down<<"diagonal: "<<diagonal<<endl;
         if(right<down && right<diagonal){
             j++;
-            pair.push_back(j);
+            p.push_back(j);
         }else if(down<diagonal){
-            pairs.push_back(pair);
+            pairs.push_back(p);
+            i++;
             //make new pair
-            pair= vector<int>();
-            pair.push_back(j);
+            p= vector<int>();
+            p.push_back(j);
         }else {
-            pairs.push_back(pair);
-            pair= vector<int>();
+            pairs.push_back(p);
+            i++;
+            p= vector<int>();
             j++;
-            pair.push_back(j);
+            p.push_back(j);
         }
+        cout<<"  -> i= "<<i<<", j= "<<j<<endl;
+        cout<<"pairs: "<<pairs.size()<<", p: "<<p.size()<<endl;
     }
-    if(pairs.size()== length){
+    cout<<"?????"<<endl;
+    if(i== length){
         for(;j<length2;j++){
-            pair.push_back(j);
+            p.push_back(j);
         }
-        pairs.push_back(pair);
+        pairs.push_back(p);
+        cout<<"DONE"<<endl;
     }
     else if(j== length2){
         while(pairs.size()<length){
-            pair=vector<int>();
-            pair.push_back(j-1);
-            pairs.push_back(pair);
+            p=vector<int>();
+            p.push_back(j-1);
+            pairs.push_back(p);
         }
+        cout<<"???"<<endl;
     }
     
     //i= start;
+    cout<<"pairing done"<<endl;
     i=0;
     vector<VectorXd> slerped_dofs;
     for(vector<vector<int>>::iterator vit= pairs.begin(); vit!=pairs.end(); vit++){
@@ -241,7 +251,7 @@ MotionSegment* MotionSegment::dynamicTimeWarping(MotionSegment* anotherMS, float
     return new MotionSegment(slerped_dofs, rotation_dof_order);
 }
  
-
+*/
 
 /* BVHmanager */
 BVHmanager::BVHmanager()

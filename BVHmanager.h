@@ -7,7 +7,7 @@ using namespace Eigen;
 #define MotionFrame_H
 class MotionFrame{
     public:
-        Vector3d root_position;
+    Vector3d root_position;
     vector<Vector3d> rotations;
     MotionFrame();
     MotionFrame(Vector3d root_position, vector<Vector3d>rotations);

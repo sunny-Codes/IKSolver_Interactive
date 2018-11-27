@@ -408,6 +408,7 @@ SetActionFromStack()
     interMotion_root_rotation_displacement.x() = 0;
     interMotion_root_rotation_displacement.z() = 0;
 
+    cout<<"setActionFromStack/ "<<root_cur_start_rot.w()<<" "<<root_cur_start_rot.vec().transpose()<<endl;
     play_once_done=true;
 }
 
@@ -422,20 +423,24 @@ void Timer(int value)
      
     // align the root
 	Vector3d intraMotion_root_position_displacement= scale* curMotionSegment->get_current_root_position_displacement(mFrame);
-    Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
-    Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToQuaternion(interMotion_root_rotation_displacement).toRotationMatrix();
+   
+    Matrix3d interMotion_root_rotation_displacement_M= AngleAxisToMatrix(interMotion_root_rotation_displacement);
 
     Vector3d newWorldTranslation= prev_action_end_position + interMotion_root_rotation_displacement_M * intraMotion_root_position_displacement;
+    
+    Vector3d root_cur_rotation= curMotionSegment->get_current_rotation(0, mFrame);
     Quaterniond newWorldRotation_quat= AngleAxisToQuaternion(interMotion_root_rotation_displacement)*AngleAxisToQuaternion(root_cur_rotation);
     
-    Matrix3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
-    
+    cout<<"newWorldRot quat: "<<newWorldRotation_quat.w()<<" "<<newWorldRotation_quat.vec().transpose()<<endl;
+    //Matrix3d newWorldRotation= newWorldRotation_quat.toRotationMatrix();
+    Vector3d newWorldRotation= QuaternionToAngleAxis(newWorldRotation_quat);
+
     //set Skeleton Root BodyNode
-    worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
-    worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
+    //worldSkel->getRootBodyNode()->setWorldRotation(newWorldRotation);
+    //worldSkel->getRootBodyNode()->setWorldTranslation(newWorldTranslation);
  
     // set Skeleton BodyNode (joints except root)
-    curMotionSegment->set_Skeleton_bodyNode_except_root(mFrame, scale, worldSkel);
+    curMotionSegment->set_Skeleton_bodyNode(newWorldTranslation, newWorldRotation, mFrame, worldSkel);
        
     TranslateViewCenter_Eye(worldSkel->getDofs().segment(0,3));
 

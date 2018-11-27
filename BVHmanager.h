@@ -71,7 +71,7 @@ class MotionSegment{
         VectorXd get_Skeleton_end_dofs();
 
         void set_Skeleton_bodyNode(int frameTime, float scale, Skeleton * skel);
-        void set_Skeleton_bodyNode_except_root(int frameTime, float scale, Skeleton * skel);
+        void set_Skeleton_bodyNode(Vector3d root_position, Vector3d root_rotation,int frmaeTime, Skeleton * skel);
     
     //int get_allJoints_size(){return allJoints.size(); }
     MotionSegment* blend(MotionSegment* anotherMS, float t);

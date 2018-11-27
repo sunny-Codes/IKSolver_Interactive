@@ -62,7 +62,6 @@ MotionSegment::MotionSegment(BVHparser * bvhParser, const char* _motion_name, in
                
                 curJoint = curJoint->getNextNode();
             }
- 
             motionFrames.push_back(mf);
         }
         knots.push_back(0);
@@ -140,7 +139,10 @@ void MotionSegment::set_Skeleton_bodyNode(int frameTime, float scale, Skeleton *
     
 }
 
-void MotionSegment::set_Skeleton_bodyNode_except_root(int frameTime, float scale, Skeleton * skel){
+void MotionSegment::set_Skeleton_bodyNode(Vector3d root_position, Vector3d root_rotation, int frameTime, Skeleton * skel){
+    skel->getRootBodyNode()->setWorldTranslation(root_position); //assume: already scaled
+    skel->getRootBodyNode()->setWorldRotation_v(root_rotation);
+
     for(int i=1; i<rotation_dof_order.size(); i++){
         Vector3d joint_rotation = get_current_rotation(i, frameTime);
         skel->getBodyNode(rotation_dof_order[i])->setRotation_v(joint_rotation);
